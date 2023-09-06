@@ -1,25 +1,19 @@
-import yaml
-from SparkManager import SparkManager
-from SparkDatabaseUtility import SparkDatabaseUtility
+#!/bin/bash
 
-# Read all configurations from YAML file
-with open("db_config.yml", "r") as yml_file:
-    all_config = yaml.safe_load(yml_file)
-
-# Choose the environment (uat or prd)
-environment = "uat"  # Change this to "prd" for production
-
-# Get the environment-specific configuration
-environment_config = all_config.get(environment, {})
-
-# Merge common configuration with environment-specific configuration
-common_config = all_config.get("common", {})
-db_config = {
-    "driver_batch_size": common_config.get("driver_batch_size", 100),
-    **environment_config
+# Function to extract the date timestamp from a file name
+extract_datestamp() {
+    filename="$1"
+    # Extract the datestamp (YYYYMMDD) from the filename
+    datestamp=$(echo "$filename" | grep -oP '\d{8}')
+    echo "$datestamp"
 }
 
-# Create SparkManager instance
-spark_manager = SparkManager("MySparkApp", db_config)
+# Get a list of unique datestamps from the filenames in the directory
+datestamps=$(find . -type f -name "*sr14*.dat" | while read -r file; do extract_datestamp "$file"; done | sort -u)
 
-# ... Rest of the code remains the same ...
+# Loop through each datestamp
+for datestamp in $datestamps; do
+    # Create a tarball for files with the current datestamp
+    tar_filename="${datestamp}.tar.gz"
+    find . -type f -name "*sr14*${datestamp}.dat" -exec tar -cvzf "$tar_filename" {} +
+done
