@@ -8,7 +8,7 @@ def send_event(job_name, event_type):
     subprocess.run(send_event_command, shell=True)
     print(f"Executed: {job_name}")
 
-def execute_jobs_in_order(rows):
+def execute_jobs_in_order(rows, event_success_states):
     job_dict = {}
     for row in rows:
         job_id, job_name, exec_order, send_event, comment, dependency_condition = row
@@ -23,7 +23,7 @@ def execute_jobs_in_order(rows):
             ready_to_run = True
             for job, event in jobs:
                 if job not in executed_jobs and event is not None:
-                    success_state = event_success_states.get(event, "SU")
+                    event_type, success_state = event.split(':')
                     if success_state not in executed_jobs:
                         ready_to_run = False
                         break
@@ -31,25 +31,30 @@ def execute_jobs_in_order(rows):
             if ready_to_run:
                 print(f"Executing jobs for order {order}:")
                 for job, event in jobs:
-                    send_event(job, event)
-                    executed_jobs.add(job)
+                    event_type, success_state = event.split(':')
+                    send_event(job, event_type)
+                    executed_jobs.add(success_state)
                     print(f"Executed: {job}")
                 del job_dict[order]
                 break
 
-if __name__ == "__main":
+if __name__ == "__main__":
     try:
         config = configparser.ConfigParser()
         config.read("config.ini")
-        get_config_file_data = config["AUTOSYS_TRIGGER"]
-        autosys_ref = get_config_file_data['autosys_job_table']
+        autosys_trigger_config = config["AUTOSYS_TRIGGER"]
+
+        # Read the event_success_states from the AUTOSYS_TRIGGER section and parse it
+        event_success_states = dict(item.split(':') for item in autosys_trigger_config['event_success_states'].split(','))
+        autosys_ref = autosys_trigger_config['autosys_job_table']
+
         conn = pyodbc.connect(Connection)  # Assuming Connection is defined in Constants
         cursor = conn.cursor()
         cursor.execute("SELECT * from " + autosys_ref)
         rows = cursor.fetchall()
 
         print("Starting AutoSys job execution...")
-        execute_jobs_in_order(rows)
+        execute_jobs_in_order(rows, event_success_states)
         print("AutoSys job execution completed.")
     except Exception as err:
         print(f"Error: {str(err)}")
