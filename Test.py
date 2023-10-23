@@ -4,7 +4,9 @@ import configparser
 
 def send_event(job_name, event_type):
     send_event_command = f"sendevent -E {event_type} -J {job_name}"
+    print(f"Executing: {send_event_command}")
     subprocess.run(send_event_command, shell=True)
+    print(f"Executed: {job_name}")
 
 def execute_jobs_in_order(rows):
     job_dict = {}
@@ -27,9 +29,11 @@ def execute_jobs_in_order(rows):
                         break
 
             if ready_to_run:
+                print(f"Executing jobs for order {order}:")
                 for job, event in jobs:
                     send_event(job, event)
                     executed_jobs.add(job)
+                    print(f"Executed: {job}")
                 del job_dict[order]
                 break
 
@@ -44,9 +48,11 @@ if __name__ == "__main":
         cursor.execute("SELECT * from " + autosys_ref)
         rows = cursor.fetchall()
 
+        print("Starting AutoSys job execution...")
         execute_jobs_in_order(rows)
+        print("AutoSys job execution completed.")
     except Exception as err:
-        print(str(err))
+        print(f"Error: {str(err)}")
     finally:
         if 'cursor' in locals():
             cursor.close()
