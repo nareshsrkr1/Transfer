@@ -1,9 +1,10 @@
 import pyodbc
 import subprocess
 import configparser
+from resource.Constants import Connection  # Import the Connection from Constants
 
-def send_event(job_name, event_type):
-    send_event_command = f"sendevent -E {event_type} -J {job_name}"
+def send_event(job_name, event):
+    send_event_command = f"sendevent -E {event} -J {job_name}"
     print(f"Executing: {send_event_command}")
     subprocess.run(send_event_command, shell=True)
     print(f"Executed: {job_name}")
@@ -23,17 +24,19 @@ def execute_jobs_in_order(rows, event_success_states):
             ready_to_run = True
             for job, event in jobs:
                 if job not in executed_jobs and event is not None:
-                    event_type, success_state = event.split(':')
-                    if success_state not in executed_jobs:
+                    if event in event_success_states:  # Check if event exists in the config
+                        ready_to_run = event_success_states[event].issubset(executed_jobs)
+                    else:
                         ready_to_run = False
-                        break
+
+                if not ready_to_run:
+                    break
 
             if ready_to_run:
                 print(f"Executing jobs for order {order}:")
                 for job, event in jobs:
-                    event_type, success_state = event.split(':')
-                    send_event(job, event_type)
-                    executed_jobs.add(success_state)
+                    send_event(job, event)
+                    executed_jobs.add(job)
                     print(f"Executed: {job}")
                 del job_dict[order]
                 break
@@ -45,7 +48,12 @@ if __name__ == "__main__":
         autosys_trigger_config = config["AUTOSYS_TRIGGER"]
 
         # Read the event_success_states from the AUTOSYS_TRIGGER section and parse it
-        event_success_states = dict(item.split(':') for item in autosys_trigger_config['event_success_states'].split(','))
+        event_success_states = {}
+        event_config = autosys_trigger_config['event_success_states'].split(',')
+        for item in event_config:
+            event_type, success_state = item.split(':')
+            event_success_states[event_type] = set(success_state.split('|'))
+
         autosys_ref = autosys_trigger_config['autosys_job_table']
 
         conn = pyodbc.connect(Connection)  # Assuming Connection is defined in Constants
