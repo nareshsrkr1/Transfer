@@ -6,6 +6,9 @@
       <label for="businessDate" class="mr-2">Business Date:</label>
       <input type="date" id="businessDate" [(ngModel)]="selectedDate" class="form-control" required>
     </div>
-    <button (click)="onSubmit()" class="btn btn-primary mt-3">Submit</button>
+    <div class="mt-3">
+      <button (click)="onApplyDate()" class="btn btn-primary mr-2">Apply Date</button>
+      <button (click)="onRestore()" class="btn btn-secondary">Restore</button>
+    </div>
   </div>
 </div>
