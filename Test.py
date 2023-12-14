@@ -1,34 +1,33 @@
-// date-selector.component.ts
+<div class="container-fluid d-flex align-items-center justify-content-center">
+  <div class="row">
+    <!-- First Block -->
+    <div class="col-md-6">
+      <div class="form-group">
+        <div class="d-flex flex-column align-items-start">
+          <label class="mb-2">Restore Data:</label>
+          <label for="businessDate" style="white-space: nowrap;">Business Date:</label>
+          <input type="date" id="businessDate" [(ngModel)]="selectedDate" class="form-control" required>
+          <div class="mt-3">
+            <button (click)="onApplyDate()" class="btn btn-primary btn-block mb-2">Apply Date</button>
+            <button (click)="onRestore()" class="btn btn-secondary btn-block">Restore</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-import { Component } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-
-@Component({
-  selector: 'app-date-selector',
-  templateUrl: './date-selector.component.html',
-  styleUrls: ['./date-selector.component.css']
-})
-export class DateSelectorComponent {
-  selectedDate: Date;
-
-  constructor(private http: HttpClient) {}
-
-  onSubmit() {
-    // Format the date as yyyy-mm-dd
-    const formattedDate = this.formatDate(this.selectedDate);
-
-    // Make a POST request to your backend
-    this.http.post('your-backend-api-endpoint', { date: formattedDate })
-      .subscribe(response => {
-        console.log('Backend response:', response);
-        // Add your further logic for handling the backend response
-      });
-  }
-
-  private formatDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = ('0' + (date.getMonth() + 1)).slice(-2); // Adding 1 to month as it is 0-indexed
-    const day = ('0' + date.getDate()).slice(-2);
-    return `${year}-${month}-${day}`;
-  }
-}
+    <!-- Second Block -->
+    <div class="col-md-6">
+      <div class="form-group">
+        <div class="d-flex flex-column align-items-start">
+          <label class="mb-2">Adhoc Run:</label>
+          <label for="businessText" style="white-space: nowrap;">Business Text:</label>
+          <input type="text" id="businessText" [(ngModel)]="selectedText" class="form-control" required>
+          <div class="mt-3">
+            <button (click)="onApplyText()" class="btn btn-primary btn-block mb-2">Apply Text</button>
+            <button (click)="onRestoreText()" class="btn btn-secondary btn-block">Restore Text</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
