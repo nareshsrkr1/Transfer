@@ -1,31 +1,23 @@
 <div class="container-fluid d-flex align-items-center justify-content-center">
   <div class="row">
-    <!-- First Block -->
+    <!-- Business Date and Business Text Block -->
     <div class="col-md-6">
       <div class="form-group">
         <div class="d-flex flex-column align-items-start">
-          <label class="mb-2">Restore Data:</label>
-          <label for="businessDate" style="white-space: nowrap;">Business Date:</label>
+          <label class="mb-2">Business Date:</label>
           <input type="date" id="businessDate" [(ngModel)]="selectedDate" class="form-control" required>
-          <div class="mt-3">
-            <button (click)="onApplyDate()" class="btn btn-primary btn-block mb-2">Apply Date</button>
-            <button (click)="onRestore()" class="btn btn-secondary btn-block">Restore</button>
-          </div>
+          <label class="mb-2">Business Text:</label>
+          <input type="text" id="businessText" [(ngModel)]="selectedText" class="form-control" required>
         </div>
       </div>
     </div>
 
-    <!-- Second Block -->
+    <!-- Buttons Block -->
     <div class="col-md-6">
       <div class="form-group">
         <div class="d-flex flex-column align-items-start">
-          <label class="mb-2">Adhoc Run:</label>
-          <label for="businessText" style="white-space: nowrap;">Business Text:</label>
-          <input type="text" id="businessText" [(ngModel)]="selectedText" class="form-control" required>
-          <div class="mt-3">
-            <button (click)="onApplyText()" class="btn btn-primary btn-block mb-2">Apply Text</button>
-            <button (click)="onRestoreText()" class="btn btn-secondary btn-block">Restore Text</button>
-          </div>
+          <button (click)="onRestoreDate()" class="btn btn-primary btn-block mb-2">Restore Date</button>
+          <button (click)="onArchiveData()" class="btn btn-secondary btn-block">Archive Data</button>
         </div>
       </div>
     </div>
