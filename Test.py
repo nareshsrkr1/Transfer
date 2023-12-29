@@ -40,10 +40,10 @@ def get_top_cpu_user_id():
     sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)
     return sorted_user_processes[0]['username']
 
-def get_top_cpu_processes(user_id):
+def get_top_cpu_processes(user_id, num_processes=10):
     processes = psutil.process_iter(['pid', 'name', 'username', 'cpu_percent'])
     user_processes = [p.info for p in processes if p.info['username'] == user_id]
-    sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)
+    sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)[:num_processes]
     return sorted_user_processes
 
 def get_server_stats(config):
