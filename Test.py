@@ -1,4 +1,4 @@
-import psutil
+import subprocess
 import json
 import yaml
 
@@ -10,11 +10,13 @@ def read_config(filename='config.yml'):
 # ... (Other functions remain unchanged)
 
 def is_process_running(service_name):
-    # Check if any process with the specified service name substring is running
-    return any(
-        service_name.lower() in process.info['name'].lower()
-        for process in psutil.process_iter(['pid', 'name'])
-    )
+    # Use ps command with grep to check if the process is running
+    command = f"ps aux | grep {service_name} | grep -v grep"
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process.wait()
+
+    # Check the return code to determine if the process is running
+    return process.returncode == 0
 
 def monitor_services(config):
     monitored_services = {}
@@ -29,7 +31,7 @@ def monitor_services(config):
             if service not in monitored_services:
                 monitored_services[service] = []
 
-            # Check if the process with the service name substring is running
+            # Check if the process with the service name is running
             process_running = is_process_running(service)
             monitored_services[service].append({'app': app_name, 'status': int(process_running)})
 
