@@ -57,12 +57,15 @@ def get_server_stats(config):
     if not top_cpu_user_id:
         top_cpu_user_id = get_top_cpu_user_id()
 
+    # Limit the number of top CPU processes to 10
+    top_cpu_processes = get_top_cpu_processes(top_cpu_user_id, num_processes=10)
+
     stats['Server Level Stats'] = {
         'CPU Info': f"{cpu_stats}%",  # Display overall CPU usage
         'Memory Info': get_memory_info(),
         'Mounts': {},
         'Top CPU User ID': top_cpu_user_id,
-        'Top CPU Processes': get_top_cpu_processes(top_cpu_user_id)
+        'Top CPU Processes': top_cpu_processes
     }
 
     # Iterate through mounts in the configuration
