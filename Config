@@ -1,0 +1,6 @@
+apps:
+  - name: dnt
+    folder_path: /app/dnt
+  - name: another_app
+    folder_path: /app/another_app
+  # Add more app configurations as needed
