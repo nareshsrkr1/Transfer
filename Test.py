@@ -8,7 +8,7 @@ def read_config(filename='config.yml'):
     return config
 
 def get_cpu_usage():
-    return psutil.cpu_percent(interval=1)
+    return psutil.cpu_percent(interval=1, percpu=True)
 
 def get_memory_info():
     memory = psutil.virtual_memory()
@@ -32,14 +32,37 @@ def get_disk_usage(mount_path):
         'percent': f"{disk.percent}%"
     }
 
+def get_top_cpu_user_id():
+    processes = psutil.process_iter(['pid', 'name', 'username', 'cpu_percent'])
+    user_processes = [p.info for p in processes if p.info['username'] != '']
+    if not user_processes:
+        return None
+    sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)
+    return sorted_user_processes[0]['username']
+
+def get_top_cpu_processes(user_id):
+    processes = psutil.process_iter(['pid', 'name', 'username', 'cpu_percent'])
+    user_processes = [p.info for p in processes if p.info['username'] == user_id]
+    sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)
+    return sorted_user_processes
+
 def get_server_stats(config):
     stats = {}
 
     # Get server-level CPU and memory information
+    cpu_stats = get_cpu_usage()
+    
+    # Determine the top CPU user ID
+    top_cpu_user_id = config['server'].get('top_cpu_user_id', '')
+    if not top_cpu_user_id:
+        top_cpu_user_id = get_top_cpu_user_id()
+
     stats['Server Level Stats'] = {
-        'CPU Info': f"{get_cpu_usage()}%",
+        'CPU Info': f"{cpu_stats}%",  # Display overall CPU usage
         'Memory Info': get_memory_info(),
-        'Mounts': {}
+        'Mounts': {},
+        'Top CPU User ID': top_cpu_user_id,
+        'Top CPU Processes': get_top_cpu_processes(top_cpu_user_id)
     }
 
     # Iterate through mounts in the configuration
