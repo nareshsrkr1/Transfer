@@ -10,22 +10,33 @@ def read_config(filename='config.yml'):
 def get_cpu_usage():
     return psutil.cpu_percent(interval=1)
 
-def get_disk_usage(folder_path):
-    disk_usage = psutil.disk_usage(folder_path)
+def get_memory_info():
+    memory = psutil.virtual_memory()
+    available = round(memory.available/1024.0/1024.0, 1)
+    total = round(memory.total/1024.0/1024.0, 1)
     return {
-        'total': disk_usage.total / (2**30),  # Convert to GB
-        'used': disk_usage.used / (2**30),
-        'free': disk_usage.free / (2**30)
+        'available': f"{available} MB",
+        'total': f"{total} MB",
+        'percent': f"{memory.percent}%"
+    }
+
+def get_disk_info():
+    disk = psutil.disk_usage('/')
+    free = round(disk.free/1024.0/1024.0/1024.0, 1)
+    total = round(disk.total/1024.0/1024.0/1024.0, 1)
+    return {
+        'free': f"{free} GB",
+        'total': f"{total} GB",
+        'percent': f"{disk.percent}%"
     }
 
 def get_server_stats(config):
     stats = {}
 
-    # Get overall CPU usage
-    cpu_stats = get_cpu_usage()
-
-    # Include overall CPU usage in the stats
-    stats['cpu_usage'] = cpu_stats
+    # Get server-level CPU, memory, and disk information
+    stats['CPU Info'] = f"{get_cpu_usage()}%"
+    stats['Memory Info'] = get_memory_info()
+    stats['Disk Info'] = get_disk_info()
 
     # App Server Space Summary section
     app_space_summary = {}
@@ -36,12 +47,6 @@ def get_server_stats(config):
 
         # Get disk usage for the app
         app_disk_stats = get_disk_usage(folder_path)
-
-        # Include disk usage for each app in the stats
-        stats[app_name] = {
-            'cpu_usage': None,  # No CPU usage for individual apps
-            'disk_usage': app_disk_stats
-        }
 
         # Add app disk usage to the summary
         app_space_summary[app_name] = {
