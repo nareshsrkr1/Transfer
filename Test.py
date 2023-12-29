@@ -8,7 +8,7 @@ def read_config(filename='config.yml'):
     return config
 
 def get_cpu_usage():
-    return psutil.cpu_percent(interval=1, percpu=True)
+    return psutil.cpu_percent(interval=1)
 
 def get_disk_usage(folder_path):
     disk_usage = psutil.disk_usage(folder_path)
@@ -34,15 +34,12 @@ def get_server_stats(config):
         app_name = app_config['name']
         folder_path = app_config['folder_path']
 
-        # Get CPU usage for the specific app
-        app_cpu_stats = cpu_stats if app_name == 'overall' else get_cpu_usage()
-
         # Get disk usage for the app
         app_disk_stats = get_disk_usage(folder_path)
 
-        # Include CPU and disk usage for each app in the stats
+        # Include disk usage for each app in the stats
         stats[app_name] = {
-            'cpu_usage': app_cpu_stats,
+            'cpu_usage': None,  # No CPU usage for individual apps
             'disk_usage': app_disk_stats
         }
 
