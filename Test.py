@@ -20,12 +20,14 @@ def get_memory_info():
         'percent': f"{memory.percent}%"
     }
 
-def get_disk_usage(folder_path='/'):
-    disk = psutil.disk_usage(folder_path)
+def get_disk_usage(mount_path):
+    disk = psutil.disk_usage(mount_path)
     free = round(disk.free/1024.0/1024.0/1024.0, 1)
+    used = round(disk.used/1024.0/1024.0/1024.0, 1)
     total = round(disk.total/1024.0/1024.0/1024.0, 1)
     return {
         'free': f"{free} GB",
+        'used': f"{used} GB",
         'total': f"{total} GB",
         'percent': f"{disk.percent}%"
     }
@@ -33,32 +35,23 @@ def get_disk_usage(folder_path='/'):
 def get_server_stats(config):
     stats = {}
 
-    # Get server-level CPU, memory, and disk information
+    # Get server-level CPU and memory information
     stats['Server Level Stats'] = {
         'CPU Info': f"{get_cpu_usage()}%",
         'Memory Info': get_memory_info(),
-        'Disk Info': get_disk_usage()
+        'Mounts': {}
     }
 
-    # App Server Space Summary section
-    app_space_summary = {}
+    # Iterate through mounts in the configuration
+    for mount_path in config['server']['mounts']:
+        # Get disk usage for the mount
+        mount_disk_stats = get_disk_usage(mount_path)
 
-    for app_config in config['apps']:
-        app_name = app_config['name']
-        folder_path = app_config['folder_path']
-
-        # Get disk usage for the app
-        app_disk_stats = get_disk_usage(folder_path)
-
-        # Add app disk usage to the summary
-        app_space_summary[app_name] = {
-            'total': app_disk_stats['total'],
-            'used': app_disk_stats['used'],
-            'free': app_disk_stats['free']
+        # Add mount disk usage to the stats
+        stats['Server Level Stats']['Mounts'][mount_path] = {
+            'path': mount_path,
+            'disk_usage': mount_disk_stats
         }
-
-    # Add the App Server Space Summary section
-    stats['App Server Space Summary'] = app_space_summary
 
     return stats
 
