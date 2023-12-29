@@ -32,6 +32,19 @@ def get_disk_usage(mount_path):
         'percent': f"{disk.percent}%"
     }
 
+def get_process_info(process):
+    try:
+        process_exe = psutil.Process(process['pid']).exe()
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        process_exe = "N/A"
+    return {
+        'pid': process['pid'],
+        'name': process['name'],
+        'username': process['username'],
+        'cpu_percent': f"{process['cpu_percent']}%",
+        'exe': process_exe
+    }
+
 def get_top_cpu_user_id():
     processes = psutil.process_iter(['pid', 'name', 'username', 'cpu_percent'])
     user_processes = [p.info for p in processes if p.info['username'] != '']
@@ -44,7 +57,7 @@ def get_top_cpu_processes(user_id, num_processes=10):
     processes = psutil.process_iter(['pid', 'name', 'username', 'cpu_percent'])
     user_processes = [p.info for p in processes if p.info['username'] == user_id]
     sorted_user_processes = sorted(user_processes, key=lambda x: x['cpu_percent'], reverse=True)[:num_processes]
-    return sorted_user_processes
+    return [get_process_info(process) for process in sorted_user_processes]
 
 def get_server_stats(config):
     stats = {}
