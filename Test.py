@@ -9,6 +9,13 @@ def read_config(filename='config.yml'):
 
 # ... (Other functions remain unchanged)
 
+def is_process_running(service_name):
+    # Check if any process with the specified service name substring is running
+    return any(
+        service_name.lower() in process.info['name'].lower()
+        for process in psutil.process_iter(['pid', 'name'])
+    )
+
 def monitor_services(config):
     monitored_services = {}
 
@@ -22,11 +29,8 @@ def monitor_services(config):
             if service not in monitored_services:
                 monitored_services[service] = []
 
-            # Check if the process with the service name is running
-            process_running = any(
-                process.info['name'] == service
-                for process in psutil.process_iter(['pid', 'name'])
-            )
+            # Check if the process with the service name substring is running
+            process_running = is_process_running(service)
             monitored_services[service].append({'app': app_name, 'status': int(process_running)})
 
     return monitored_services
