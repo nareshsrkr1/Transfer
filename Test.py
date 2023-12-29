@@ -1,29 +1,23 @@
 import os
-import psutil
-import json
-import yaml
 
-def read_config(filename='config.yml'):
-    with open(filename, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
+def get_top_folder_sizes(base_path, num_folders=10):
+    folder_sizes = []
 
-def get_folder_size(folder_path):
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(folder_path):
-        for filename in filenames:
-            filepath = os.path.join(dirpath, filename)
-            total_size += os.path.getsize(filepath)
-    return total_size / (2**30)  # Convert to GB
+    for dirpath, dirnames, filenames in os.walk(base_path):
+        folder_size = sum(os.path.getsize(os.path.join(dirpath, filename)) for filename in filenames)
+        folder_sizes.append((dirpath, folder_size))
 
-def get_top_files(folder_path, num_files=5):
-    files_info = []
-    for dirpath, dirnames, filenames in os.walk(folder_path):
-        file_sizes = [(os.path.join(dirpath, filename), os.path.getsize(os.path.join(dirpath, filename))) for filename in filenames]
-        file_sizes.sort(key=lambda x: x[1], reverse=True)
-        top_files = file_sizes[:num_files]
-        files_info.extend(top_files)
-    return files_info
+    # Sort folders based on size in descending order
+    sorted_folders = sorted(folder_sizes, key=lambda x: x[1], reverse=True)
+
+    # Get the top N folders
+    top_folders = sorted_folders[:num_folders]
+
+    # Convert sizes to GB
+    top_folders_in_gb = [(folder[0], folder[1] / (2**30)) for folder in top_folders]
+
+    return top_folders_in_gb
+
 
 def get_app_server_space(config):
     app_space_info = {}
@@ -44,29 +38,15 @@ def get_app_server_space(config):
             # Get top 5 most occupied files
             top_files = get_top_files(path)
 
+            # Get top 10 occupied folder sizes
+            top_folders = get_top_folder_sizes(path, num_folders=10)
+
             # Add information to the app_space_info dictionary
             app_space_info[app_name][path_name] = {
                 'folder_size': folder_size,
-                'top_files': [{'file': file[0], 'size': file[1]} for file in top_files]
+                'top_files': [{'file': file[0], 'size': file[1]} for file in top_files],
+                'top_folders': [{'folder': folder[0], 'size': folder[1]} for folder in top_folders]
             }
 
     return app_space_info
-
-def get_server_stats(config):
-    stats = {}
-
-    # ... (existing code for CPU, memory, mounts)
-
-    # Add app server space information
-    app_server_space = get_app_server_space(config)
-    stats['App Server Space'] = app_server_space
-
-    return stats
-
-# ... (remaining code remains the same)
-
-if __name__ == "__main__":
-    config = read_config()
-    server_stats = get_server_stats(config)
-    save_to_json(server_stats)
     
