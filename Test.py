@@ -20,8 +20,8 @@ def get_memory_info():
         'percent': f"{memory.percent}%"
     }
 
-def get_disk_info():
-    disk = psutil.disk_usage('/')
+def get_disk_usage(folder_path='/'):
+    disk = psutil.disk_usage(folder_path)
     free = round(disk.free/1024.0/1024.0/1024.0, 1)
     total = round(disk.total/1024.0/1024.0/1024.0, 1)
     return {
@@ -34,9 +34,11 @@ def get_server_stats(config):
     stats = {}
 
     # Get server-level CPU, memory, and disk information
-    stats['CPU Info'] = f"{get_cpu_usage()}%"
-    stats['Memory Info'] = get_memory_info()
-    stats['Disk Info'] = get_disk_info()
+    stats['Server Level Stats'] = {
+        'CPU Info': f"{get_cpu_usage()}%",
+        'Memory Info': get_memory_info(),
+        'Disk Info': get_disk_usage()
+    }
 
     # App Server Space Summary section
     app_space_summary = {}
