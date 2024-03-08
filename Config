@@ -13,8 +13,11 @@ FROM YourTable;
 -- Update the original table with values from the temporary table
 UPDATE YourTable
 SET HashID = t.HashID
-FROM YourTable yt
-JOIN #TempHashIDs t ON yt.PrimaryKeyColumn = t.RowNum; -- Replace PrimaryKeyColumn with the actual primary key column name of YourTable
+FROM (
+    SELECT RowNum, HashID
+    FROM #TempHashIDs
+) t
+WHERE YourTable.id = t.RowNum; -- Replace 'id' with an appropriate column name from YourTable that uniquely identifies each row
 
 -- Drop the temporary table
 DROP TABLE #TempHashIDs;
