@@ -1,6 +1,20 @@
-apps:
-  - name: dnt
-    folder_path: /app/dnt
-  - name: another_app
-    folder_path: /app/another_app
-  # Add more app configurations as needed
+-- Create a temporary table to store the generated values
+CREATE TABLE #TempHashIDs (
+    RowNum INT,
+    HashID VARCHAR(100)
+);
+
+-- Insert unique random values into the temporary table
+INSERT INTO #TempHashIDs (RowNum, HashID)
+SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),
+       CONCAT(CONVERT(VARCHAR(36), NEWID()), '_', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)))
+FROM YourTable;
+
+-- Update the original table with values from the temporary table
+UPDATE YourTable
+SET HashID = t.HashID
+FROM YourTable yt
+JOIN #TempHashIDs t ON yt.PrimaryKeyColumn = t.RowNum; -- Replace PrimaryKeyColumn with the actual primary key column name of YourTable
+
+-- Drop the temporary table
+DROP TABLE #TempHashIDs;
