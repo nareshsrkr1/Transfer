@@ -16,15 +16,17 @@ def get_directory_size(dir_path):
 def scan_directory(args):
     dir_path, threshold_space_limit = args
     directories_with_space = []
-
-    for root, dirs, _ in os.walk(dir_path):
-        for dir_name in dirs:
-            dir_path = os.path.join(root, dir_name)
-            dir_size = get_directory_size(dir_path)
-            dir_size_gb = round(dir_size / (1024 ** 3), 2)
-            
-            if dir_size > threshold_space_limit:
-                directories_with_space.append((dir_path, dir_size_gb))
+    
+    dir_size = get_directory_size(dir_path)
+    if dir_size > threshold_space_limit:
+        for root, dirs, _ in os.walk(dir_path):
+            for dir_name in dirs:
+                dir_path = os.path.join(root, dir_name)
+                dir_size = get_directory_size(dir_path)
+                dir_size_gb = round(dir_size / (1024 ** 3), 2)
+                
+                if dir_size > threshold_space_limit:
+                    directories_with_space.append((dir_path, dir_size_gb))
     return directories_with_space
 
 def get_directories_with_space(config_file):
