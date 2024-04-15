@@ -1,17 +1,25 @@
 import os
-import shutil
+import subprocess
 import yaml
 import concurrent.futures
 
 def get_directory_size(dir_path):
-    total_size = 0
-    if os.path.exists(dir_path) and os.path.isdir(dir_path):
-        for root, dirs, files in os.walk(dir_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                if not os.path.islink(file_path):  # Skip symbolic links
-                    total_size += os.path.getsize(file_path)
-    return total_size
+    try:
+        du_output = subprocess.check_output(['du', '-sh', dir_path])
+        size_str, _ = du_output.split(maxsplit=1)
+        size_str = size_str.decode('utf-8').strip()
+        size, unit = float(size_str[:-1]), size_str[-1]
+        if unit == 'K':
+            size *= 1024
+        elif unit == 'M':
+            size *= 1024 * 1024
+        elif unit == 'G':
+            size *= 1024 * 1024 * 1024
+        elif unit == 'T':
+            size *= 1024 * 1024 * 1024 * 1024
+        return int(size)
+    except subprocess.CalledProcessError:
+        return -1
 
 def scan_directory(args):
     dir_path, threshold_space_limit = args
@@ -19,14 +27,7 @@ def scan_directory(args):
     
     dir_size = get_directory_size(dir_path)
     if dir_size > threshold_space_limit:
-        for root, dirs, _ in os.walk(dir_path):
-            for dir_name in dirs:
-                dir_path = os.path.join(root, dir_name)
-                dir_size = get_directory_size(dir_path)
-                dir_size_gb = round(dir_size / (1024 ** 3), 2)
-                
-                if dir_size > threshold_space_limit:
-                    directories_with_space.append((dir_path, dir_size_gb))
+        directories_with_space.append((dir_path, dir_size))
     return directories_with_space
 
 def get_directories_with_space(config_file):
@@ -54,6 +55,6 @@ result = get_directories_with_space(config_file)
 if result:
     print("Directories with space more than threshold limit:")
     for dir_path, space_used in result:
-        print(f"Directory Path: {dir_path}, Space Used: {space_used} GB")
+        print(f"Directory Path: {dir_path}, Space Used: {space_used} bytes")
 else:
     print("No directories found with space more than threshold limit.")
