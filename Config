@@ -1,4 +1,63 @@
+import os
+import subprocess
+import yaml
+import concurrent.futures
 import pyodbc
+
+# Function to calculate directory size using du -sh
+def get_directory_size(dir_path):
+    try:
+        du_output = subprocess.check_output(['du', '-sh', dir_path])
+        size_str, _ = du_output.split(maxsplit=1)
+        size_str = size_str.decode('utf-8').strip()
+        size, unit = float(size_str[:-1]), size_str[-1]
+        if unit == 'K':
+            size *= 1024
+        elif unit == 'M':
+            size *= 1024 * 1024
+        elif unit == 'G':
+            size *= 1024 * 1024 * 1024
+        elif unit == 'T':
+            size *= 1024 * 1024 * 1024 * 1024
+        return int(size)
+    except subprocess.CalledProcessError:
+        return -1
+
+# Function to scan a directory and get directories exceeding threshold
+def scan_directory(args):
+    dir_path, threshold_space_limit = args
+    directories_with_space = []
+
+    for root, dirs, files in os.walk(dir_path):
+        for dir_name in dirs:
+            dir_full_path = os.path.join(root, dir_name)
+            dir_size = get_directory_size(dir_full_path)
+            if dir_size > threshold_space_limit:
+                directories_with_space.append((dir_full_path, dir_size))
+                if len(directories_with_space) >= 10:
+                    return directories_with_space  # Stop if 10 directories found
+    return directories_with_space
+
+# Function to get directories with space exceeding threshold
+def get_directories_with_space(config_file):
+    directories_with_space = []
+
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)['app_space_monitor']
+
+    for app_config in config:
+        app_name = app_config['name']
+        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
+        
+        for path_entry in app_config.get('paths', []):
+            app_path = path_entry['path']
+            
+            if os.path.exists(app_path) and os.path.isdir(app_path):
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
+                    for result in results:
+                        directories_with_space.extend(result)
+    return directories_with_space
 
 # Function to save results to SQL Server database
 def save_to_db(results):
