@@ -7,24 +7,35 @@ def get_directories_with_space(config_file):
         config = yaml.safe_load(f)['app_space_monitor']
 
     directories_with_space = []
+    num_folders_found = 0
 
     for app_config in config:
         app_name = app_config['name']
         threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
-        num_of_folders = app_config.get('num_of_folders', 0)
         
         for path_entry in app_config.get('paths', []):
             path_name = path_entry['name']
-            path = path_entry['path']
+            app_path = path_entry['path']
             
-            # Check if the directory exists
-            if os.path.isdir(path):
-                # Get disk usage information
-                total, used, free = shutil.disk_usage(path)
-                
-                # Check if the used space exceeds the threshold limit
-                if used > threshold_space_limit:
-                    directories_with_space.append((app_name, path_name, path, used, num_of_folders))
+            # Recursively scan directories under the app path
+            for root, dirs, files in os.walk(app_path):
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    
+                    # Get disk usage information
+                    total, used, free = shutil.disk_usage(dir_path)
+                    
+                    # Convert space used to GB and round to 2 decimal places
+                    used_gb = round(used / (1024 ** 3), 2)
+                    
+                    # Check if the used space exceeds the threshold limit
+                    if used > threshold_space_limit:
+                        directories_with_space.append((app_name, path_name, dir_name, dir_path, used_gb))
+                        num_folders_found += 1
+                        
+                        # Check if we have found 10 folders
+                        if num_folders_found == 10:
+                            return directories_with_space
     
     return directories_with_space
 
@@ -34,7 +45,7 @@ result = get_directories_with_space(config_file)
 
 if result:
     print("Directories with space more than threshold limit:")
-    for app_name, path_name, path, space_used, num_of_folders in result:
-        print(f"App Name: {app_name}, Path Name: {path_name}, Path: {path}, Space Used: {space_used} bytes, Num of Folders: {num_of_folders}")
+    for app_name, path_name, dir_name, dir_path, space_used in result:
+        print(f"App Name: {app_name}, Path Name: {path_name}, Directory Name: {dir_name}, Path: {dir_path}, Space Used: {space_used} GB")
 else:
     print("No directories found with space more than threshold limit.")
