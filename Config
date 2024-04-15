@@ -16,4 +16,23 @@ def get_directories_with_space(config_file):
         dir_path = entry['path']
         
         # Check if the directory exists
-        if os.path
+        if os.path.isdir(dir_path):
+            # Get disk usage information
+            total, used, free = shutil.disk_usage(dir_path)
+            
+            # Check if the used space exceeds the threshold limit
+            if used > threshold_space_limit:
+                directories_with_space.append((dir_name, dir_path, used))
+    
+    return directories_with_space
+
+# Example usage
+config_file = 'config.yml'
+result = get_directories_with_space(config_file)
+
+if result:
+    print("Directories with space more than threshold limit:")
+    for directory, path, space_used in result:
+        print(f"Directory Name: {directory}, Path: {path}, Space Used: {space_used} bytes")
+else:
+    print("No directories found with space more than threshold limit.")
