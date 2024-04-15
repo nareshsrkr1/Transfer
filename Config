@@ -1,23 +1,38 @@
--- Create a temporary table to store the generated values
-CREATE TABLE #TempHashIDs (
-    RowNum INT,
-    HashID VARCHAR(100)
-);
+import os
+import shutil
+import yaml
 
--- Insert unique random values into the temporary table
-INSERT INTO #TempHashIDs (RowNum, HashID)
-SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)),
-       CONCAT(CONVERT(VARCHAR(36), NEWID()), '_', ROW_NUMBER() OVER (ORDER BY (SELECT NULL)))
-FROM YourTable;
+def get_directories_with_space(config_file):
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
 
--- Update the original table with values from the temporary table
-UPDATE YourTable
-SET HashID = t.HashID
-FROM (
-    SELECT RowNum, HashID
-    FROM #TempHashIDs
-) t
-WHERE YourTable.id = t.RowNum; -- Replace 'id' with an appropriate column name from YourTable that uniquely identifies each row
+    path = config['paths']
+    threshold_space_limit = config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
+    
+    directories_with_space = []
 
--- Drop the temporary table
-DROP TABLE #TempHashIDs;
+    for entry in path:
+        dir_name = entry['-name']
+        dir_path = entry['path']
+        
+        # Check if the directory exists
+        if os.path.isdir(dir_path):
+            # Get disk usage information
+            total, used, free = shutil.disk_usage(dir_path)
+            
+            # Check if the used space exceeds the threshold limit
+            if used > threshold_space_limit:
+                directories_with_space.append((dir_name, dir_path, used))
+    
+    return directories_with_space
+
+# Example usage
+config_file = 'config.yml'
+result = get_directories_with_space(config_file)
+
+if result:
+    print("Directories with space more than threshold limit:")
+    for directory, path, space_used in result:
+        print(f"Directory Name: {directory}, Path: {path}, Space Used: {space_used} bytes")
+else:
+    print("No directories found with space more than threshold limit.")
