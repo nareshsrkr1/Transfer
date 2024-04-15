@@ -6,23 +6,25 @@ def get_directories_with_space(config_file):
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)['app_space_monitor']
 
-    paths = config['paths']
-    threshold_space_limit = config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
-    
     directories_with_space = []
 
-    for entry in paths:
-        dir_name = entry['name']
-        dir_path = entry['path']
+    for app_config in config:
+        app_name = app_config['name']
+        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
+        num_of_folders = app_config.get('num_of_folders', 0)
         
-        # Check if the directory exists
-        if os.path.isdir(dir_path):
-            # Get disk usage information
-            total, used, free = shutil.disk_usage(dir_path)
+        for path_entry in app_config.get('paths', []):
+            path_name = path_entry['name']
+            path = path_entry['path']
             
-            # Check if the used space exceeds the threshold limit
-            if used > threshold_space_limit:
-                directories_with_space.append((dir_name, dir_path, used))
+            # Check if the directory exists
+            if os.path.isdir(path):
+                # Get disk usage information
+                total, used, free = shutil.disk_usage(path)
+                
+                # Check if the used space exceeds the threshold limit
+                if used > threshold_space_limit:
+                    directories_with_space.append((app_name, path_name, path, used, num_of_folders))
     
     return directories_with_space
 
@@ -32,7 +34,7 @@ result = get_directories_with_space(config_file)
 
 if result:
     print("Directories with space more than threshold limit:")
-    for directory, path, space_used in result:
-        print(f"Directory Name: {directory}, Path: {path}, Space Used: {space_used} bytes")
+    for app_name, path_name, path, space_used, num_of_folders in result:
+        print(f"App Name: {app_name}, Path Name: {path_name}, Path: {path}, Space Used: {space_used} bytes, Num of Folders: {num_of_folders}")
 else:
     print("No directories found with space more than threshold limit.")
