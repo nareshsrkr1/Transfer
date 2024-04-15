@@ -2,6 +2,7 @@ import os
 import subprocess
 import yaml
 import concurrent.futures
+import multiprocessing
 import sqlite3
 
 # Function to calculate directory size using du -sh
@@ -55,8 +56,8 @@ def get_directories_with_space(config_file):
     return directories_with_space
 
 # Function to save results to database
-def save_to_db(results, db_path):
-    conn = sqlite3.connect(db_path)
+def save_to_db(results):
+    conn = sqlite3.connect('directory_space.db')
     cursor = conn.cursor()
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS directory_space (
@@ -86,12 +87,13 @@ def save_to_db(results, db_path):
     conn.close()
 
 # Example usage
-config_file = 'config.yml'
-results = get_directories_with_space(config_file)
+if __name__ == '__main__':
+    config_file = 'config.yml'
+    results = get_directories_with_space(config_file)
 
-if results:
-    db_path = 'directory_space.db'
-    save_to_db(results, db_path)
-    print("Results saved to database.")
-else:
-    print("No directories found with space more than threshold limit.")
+    if results:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            executor.map(save_to_db, [results])
+        print("Results saved to database.")
+    else:
+        print("No directories found with space more than threshold limit.")
