@@ -1,50 +1,11 @@
 import os
-import yaml
 
 def get_directory_size(dir_path):
     total_size = 0
-    for root, dirs, files in os.walk(dir_path):
-        for file in files:
-            file_path = os.path.join(root, file)
-            total_size += os.path.getsize(file_path)
+    if os.path.exists(dir_path) and os.path.isdir(dir_path):
+        for root, dirs, files in os.walk(dir_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if not os.path.islink(file_path):  # Skip symbolic links
+                    total_size += os.path.getsize(file_path)
     return total_size
-
-def get_directories_with_space(config_file):
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['app_space_monitor']
-
-    directories_with_space = []
-
-    for app_config in config:
-        app_name = app_config['name']
-        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
-        
-        for path_entry in app_config.get('paths', []):
-            path_name = path_entry['name']
-            app_path = path_entry['path']
-            
-            # Iterate over directories and subdirectories
-            for root, dirs, _ in os.walk(app_path):
-                for dir_name in dirs:
-                    dir_path = os.path.join(root, dir_name)
-                    dir_size = get_directory_size(dir_path)
-                    
-                    # Convert space used to GB and round to 2 decimal places
-                    dir_size_gb = round(dir_size / (1024 ** 3), 2)
-                    
-                    # Check if the used space exceeds the threshold limit
-                    if dir_size > threshold_space_limit:
-                        directories_with_space.append((app_name, path_name, dir_path, dir_size_gb))
-    
-    return directories_with_space
-
-# Example usage
-config_file = 'config.yml'
-result = get_directories_with_space(config_file)
-
-if result:
-    print("Directories with space more than threshold limit:")
-    for app_name, path_name, dir_path, space_used in result:
-        print(f"App Name: {app_name}, Path Name: {path_name}, Directory Path: {dir_path}, Space Used: {space_used} GB")
-else:
-    print("No directories found with space more than threshold limit.")
