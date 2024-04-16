@@ -1,79 +1,10 @@
-import os
-import yaml
-import pyodbc
-import socket
-import subprocess
-from datetime import datetime
-
-def save_app_level_info_to_db(results):
-    conn = pyodbc.connect(Constants.Connection)
-    cursor = conn.cursor()
-
-    try:
-        for result in results:
-            app_name, path, num_of_folders, threshold, directories = result
-            for directory in directories:
-                cursor.execute('''INSERT INTO app_space_info (app_name, path, num_of_folders, threshold, directory_name, directory_size, last_updated)
-                                  VALUES (?, ?, ?, ?, ?, ?, ?)''', (app_name, path, num_of_folders, threshold, directory[0], directory[1], datetime.now()))
-        conn.commit()
-        print("App level info inserted successfully.")
-    except pyodbc.Error as e:
-        print("App level info insertion failed:", e)
-    finally:
-        conn.close()
-
-def get_app_level_info(config_file):
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['apps_space_monitor']
-
-    results = []
-
-    for app_config in config:
-        app_name = app_config['name']
-        num_of_folders = app_config.get('num_of_folders', 0)
-        threshold = app_config.get('threshold', 0)
-        paths = app_config.get('paths', [])
-
-        for path_entry in paths:
-            path = path_entry['path']
-
-            directories = []
-            try:
-                output = subprocess.check_output(['du', '-ah', path]).decode('utf-8')
-                lines = output.split('\n')
-                for line in lines:
-                    if line:
-                        size_str, dir_name = line.split('\t')
-                        dir_size = size_str.rstrip()  # Remove trailing whitespace
-                        if dir_size[-1].lower() == 'g':
-                            dir_size = float(dir_size[:-1])
-                        elif dir_size[-1].lower() == 'm':
-                            dir_size = float(dir_size[:-1]) / 1024
-                        elif dir_size[-1].lower() == 'k':
-                            dir_size = float(dir_size[:-1]) / (1024 * 1024)
-                        else:
-                            continue  # Skip directories with unknown size unit
-                        if dir_size > threshold:
-                            directories.append((dir_name, dir_size))
-            except subprocess.CalledProcessError as e:
-                print(f"Error retrieving disk usage for path {path}: {e}")
-
-            # Sort directories by size in descending order
-            directories.sort(key=lambda x: x[1], reverse=True)
-            # Take the top 10 directories if there are more than 10
-            top_directories = directories[:10]
-
-            results.append((app_name, path, num_of_folders, threshold, top_directories))
-
-    return results
-
-if __name__ == '__main__':
-    Constants = Constants() # Assuming Constants is a class or module containing connection details
-    hostname = socket.gethostname()
-    config_file = 'config.yml'
-    results = get_app_level_info(config_file)
-
-    if results:
-        save_app_level_info_to_db(results)
-    else:
-        print("No directories found with size above threshold.")
+CREATE TABLE app_space_info (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    app_name NVARCHAR(255),
+    path NVARCHAR(255),
+    num_of_folders INT,
+    threshold FLOAT,
+    directory_name NVARCHAR(255),
+    directory_size FLOAT,
+    last_updated DATETIME
+);
