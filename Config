@@ -6,7 +6,81 @@ def get_disk_usage(path):
         line = lines[-2]
         # Extract size, used space, and available space from the line
         _, size, used, available, _ = line.split()
-        return float(size[:-1]), float(used[:-1]), float(available[:-1])  # Remove the last character (e.g., 'G', 'M') from the values
+        size, used, available = convert_size_to_gb(size), convert_size_to_gb(used), convert_size_to_gb(available)
+        return size, used, available
     except subprocess.CalledProcessError as e:
         print(f"Error retrieving disk usage for path {path}: {e}")
         return None, None, None
+
+def convert_size_to_gb(size_str):
+    if size_str[-1].lower() == 't':
+        return float(size_str[:-1]) * 1024  # Convert TB to GB
+    elif size_str[-1].lower() == 'g':
+        return float(size_str[:-1])  # Size is already in GB
+    elif size_str[-1].lower() == 'm':
+        return float(size_str[:-1]) / 1024  # Convert MB to GB
+    else:
+        return None  # Unknown size unit
+
+def convert_du_output_to_gb(size_str):
+    try:
+        # Parse size string from exponential form (e.g., '1.5G') and convert to GB or MB
+        size, unit = size_str.split()
+        size = float(size)
+        if unit.lower() == 't':
+            return size * 1024  # Convert TB to GB
+        elif unit.lower() == 'g':
+            return size  # Size is already in GB
+        elif unit.lower() == 'm':
+            return size / 1024  # Convert MB to GB
+        else:
+            return None  # Unknown size unit
+    except ValueError:
+        return None  # Unable to parse size string
+
+def get_directories_with_size(config_file):
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)['apps_space_monitor']
+
+    results = []
+
+    for app_config in config:
+        app_name = app_config['name'].lower()  # Convert app name to lowercase for case-insensitive comparison
+        paths = app_config.get('paths', [])
+        threshold = app_config.get('threshold', 0)
+
+        for path_entry in paths:
+            sub_app_name = path_entry['name']
+            path = path_entry['path']
+
+            # Get disk usage for NAS apps using df -h
+            if 'nas' in app_name:
+                size, used_space, available_space = get_disk_usage(path)
+            else:
+                # Get disk usage for other apps using du -sh
+                try:
+                    output = subprocess.check_output(['du', '-sh', path]).decode('utf-8')
+                    size_str = output.split()[0]  # Extract size string from the output
+                    size = convert_du_output_to_gb(size_str)
+                    used_space = size
+                    available_space = None
+                except subprocess.CalledProcessError as e:
+                    print(f"Error retrieving disk usage for path {path}: {e}")
+                    size = None
+                    used_space = None
+                    available_space = None
+
+            results.append((app_name, sub_app_name, path, size, used_space, available_space))
+
+    return results
+
+if __name__ == '__main__':
+    Constants = Constants() # Assuming Constants is a class or module containing connection details
+    hostname = socket.gethostname()
+    config_file = 'config.yml'
+    results = get_directories_with_size(config_file)
+
+    if results:
+        save_to_db(results)
+    else:
+        print("No directories found with space more than threshold limit.")
