@@ -1,76 +1,68 @@
-def get_disk_usage(path):
+import os
+import yaml
+import pyodbc
+import socket
+import subprocess
+from datetime import datetime
+
+def save_to_db(results):
+    conn = pyodbc.connect(Constants.Connection)
+    cursor = conn.cursor()
+
     try:
-        output = subprocess.check_output(['df', '-h', path]).decode('utf-8')
-        lines = output.split('\n')
-        # Skip header line and extract the last line of output (which contains disk usage information)
-        line = lines[-2]
-        # Extract size, used space, and available space from the line
-        _, size, used, available, _ = line.split()
-        size, used, available = convert_size_to_gb(size), convert_size_to_gb(used), convert_size_to_gb(available)
-        return size, used, available
-    except subprocess.CalledProcessError as e:
-        print(f"Error retrieving disk usage for path {path}: {e}")
-        return None, None, None
+        for result in results:
+            app_name, path, threshold_size, directories = result
+            for directory in directories:
+                cursor.execute('''INSERT INTO app_space_info (app_name, path, directory_name, directory_size, last_updated)
+                                  VALUES (?, ?, ?, ?, ?)''', (app_name, path, directory[0], directory[1], datetime.now()))
+        conn.commit()
+        print("Data inserted successfully.")
+    except pyodbc.Error as e:
+        print("Data insertion failed:", e)
+    finally:
+        conn.close()
 
-def convert_size_to_gb(size_str):
-    if size_str[-1].lower() == 't':
-        return float(size_str[:-1]) * 1024  # Convert TB to GB
-    elif size_str[-1].lower() == 'g':
-        return float(size_str[:-1])  # Size is already in GB
-    elif size_str[-1].lower() == 'm':
-        return float(size_str[:-1]) / 1024  # Convert MB to GB
-    else:
-        return None  # Unknown size unit
-
-def convert_du_output_to_gb(size_str):
-    try:
-        # Parse size string from exponential form (e.g., '1.5G') and convert to GB or MB
-        size, unit = size_str.split()
-        size = float(size)
-        if unit.lower() == 't':
-            return size * 1024  # Convert TB to GB
-        elif unit.lower() == 'g':
-            return size  # Size is already in GB
-        elif unit.lower() == 'm':
-            return size / 1024  # Convert MB to GB
-        else:
-            return None  # Unknown size unit
-    except ValueError:
-        return None  # Unable to parse size string
-
-def get_directories_with_size(config_file):
+def get_top_folders_above_threshold(config_file):
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)['apps_space_monitor']
 
     results = []
 
     for app_config in config:
-        app_name = app_config['name'].lower()  # Convert app name to lowercase for case-insensitive comparison
+        app_name = app_config['name']
         paths = app_config.get('paths', [])
         threshold = app_config.get('threshold', 0)
 
         for path_entry in paths:
-            sub_app_name = path_entry['name']
             path = path_entry['path']
 
-            # Get disk usage for NAS apps using df -h
-            if 'nas' in app_name:
-                size, used_space, available_space = get_disk_usage(path)
-            else:
-                # Get disk usage for other apps using du -sh
-                try:
-                    output = subprocess.check_output(['du', '-sh', path]).decode('utf-8')
-                    size_str = output.split()[0]  # Extract size string from the output
-                    size = convert_du_output_to_gb(size_str)
-                    used_space = size
-                    available_space = None
-                except subprocess.CalledProcessError as e:
-                    print(f"Error retrieving disk usage for path {path}: {e}")
-                    size = None
-                    used_space = None
-                    available_space = None
+            directories = []
+            try:
+                output = subprocess.check_output(['du', '-ah', path]).decode('utf-8')
+                lines = output.split('\n')
+                for line in lines:
+                    if line:
+                        size_str, dir_name = line.split('\t')
+                        dir_size = size_str.rstrip()  # Remove trailing whitespace
+                        if dir_size[-1].lower() == 'g':
+                            dir_size = float(dir_size[:-1])
+                        elif dir_size[-1].lower() == 'm':
+                            dir_size = float(dir_size[:-1]) / 1024
+                        elif dir_size[-1].lower() == 'k':
+                            dir_size = float(dir_size[:-1]) / (1024 * 1024)
+                        else:
+                            continue  # Skip directories with unknown size unit
+                        if dir_size > threshold:
+                            directories.append((dir_name, dir_size))
+            except subprocess.CalledProcessError as e:
+                print(f"Error retrieving disk usage for path {path}: {e}")
 
-            results.append((app_name, sub_app_name, path, size, used_space, available_space))
+            # Sort directories by size in descending order
+            directories.sort(key=lambda x: x[1], reverse=True)
+            # Take the top 10 directories if there are more than 10
+            top_directories = directories[:10]
+
+            results.append((app_name, path, threshold, top_directories))
 
     return results
 
@@ -78,9 +70,9 @@ if __name__ == '__main__':
     Constants = Constants() # Assuming Constants is a class or module containing connection details
     hostname = socket.gethostname()
     config_file = 'config.yml'
-    results = get_directories_with_size(config_file)
+    results = get_top_folders_above_threshold(config_file)
 
     if results:
         save_to_db(results)
     else:
-        print("No directories found with space more than threshold limit.")
+        print("No directories found with size above threshold.")
