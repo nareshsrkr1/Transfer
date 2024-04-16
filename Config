@@ -1,85 +1,12 @@
-import os
-import yaml
-import subprocess
-import pyodbc
-import socket
-
-def save_to_db(results):
-    conn = pyodbc.connect(Constants.Connection)
-    cursor = conn.cursor()
-
-    try:
-        for result in results:
-            app_name, sub_app_name, path, size, used_space, available_space = result
-            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size, used_space, available_space, last_updated)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''', (hostname, app_name, sub_app_name, path, size, used_space, available_space))
-        conn.commit()
-        print("Data inserted successfully.")
-    except pyodbc.Error as e:
-        print("Data insertion failed:", e)
-    finally:
-        conn.close()
-
 def get_disk_usage(path):
     try:
         output = subprocess.check_output(['df', '-h', path]).decode('utf-8')
         lines = output.split('\n')
-        # Extract used and available space from the second line of the output
-        _, size, used, available, _ = lines[1].split()
-        return float(size), float(used), float(available)
+        # Skip header line and extract the last line of output (which contains disk usage information)
+        line = lines[-2]
+        # Extract size, used space, and available space from the line
+        _, size, used, available, _ = line.split()
+        return float(size[:-1]), float(used[:-1]), float(available[:-1])  # Remove the last character (e.g., 'G', 'M') from the values
     except subprocess.CalledProcessError as e:
         print(f"Error retrieving disk usage for path {path}: {e}")
         return None, None, None
-
-def get_directories_with_size(config_file):
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['apps_space_monitor']
-
-    results = []
-
-    for app_config in config:
-        app_name = app_config['name'].lower()  # Convert app name to lowercase for case-insensitive comparison
-        paths = app_config.get('paths', [])
-        threshold = app_config.get('threshold', 0)
-
-        for path_entry in paths:
-            sub_app_name = path_entry['name']
-            path = path_entry['path']
-
-            # Get disk usage for NAS apps using df -h
-            if 'nas' in app_name:
-                size, used_space, available_space = get_disk_usage(path)
-            else:
-                # Get disk usage for other apps using du -sh
-                try:
-                    output = subprocess.check_output(['du', '-sh', path]).decode('utf-8')
-                    size_str = output.split()[0]  # Extract size string from the output
-                    size = parse_size(size_str)
-                    used_space = size
-                    available_space = None
-                except subprocess.CalledProcessError as e:
-                    print(f"Error retrieving disk usage for path {path}: {e}")
-                    size = None
-                    used_space = None
-                    available_space = None
-
-            results.append((app_name, sub_app_name, path, size, used_space, available_space))
-
-    return results
-
-def parse_size(size_str):
-    # Parse size string (e.g., "2.5G" -> 2.5 * 1024^3)
-    suffixes = {'K': 1024, 'M': 1024 ** 2, 'G': 1024 ** 3, 'T': 1024 ** 4}
-    size, suffix = float(size_str[:-1]), size_str[-1]
-    return size * suffixes[suffix]
-
-if __name__ == '__main__':
-    Constants = Constants() # Assuming Constants is a class or module containing connection details
-    hostname = socket.gethostname()
-    config_file = 'config.yml'
-    results = get_directories_with_size(config_file)
-
-    if results:
-        save_to_db(results)
-    else:
-        print("No directories found with space more than threshold limit.")
