@@ -1,17 +1,14 @@
-import os
-import yaml
-import shutil
-import concurrent.futures
-import pyodbc
-import socket
-
-def get_directory_size(dir_path):
-    total_size = 0
-    for root, _, files in os.walk(dir_path):
-        for file in files:
-            file_path = os.path.join(root, file)
-            total_size += os.path.getsize(file_path)
-    return total_size
+CREATE TABLE directory_sizes (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    hostname VARCHAR(255),
+    app_name VARCHAR(255),
+    sub_app_name VARCHAR(255),
+    path VARCHAR(255),
+    size_formatted VARCHAR(20),  -- Changed data type to VARCHAR
+    used_space_formatted VARCHAR(20),  -- Changed data type to VARCHAR
+    available_space_formatted VARCHAR(20),  -- Changed data type to VARCHAR
+    last_updated DATETIME DEFAULT GETDATE()
+);
 
 def save_to_db(results):
     conn = pyodbc.connect(Constants.Connection)
@@ -20,8 +17,12 @@ def save_to_db(results):
     try:
         for result in results:
             app_name, sub_app_name, path, size, used_space, available_space = result
-            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size, used_space, available_space)
-                              VALUES (?, ?, ?, ?, ?, ?, ?)''', (hostname, app_name, sub_app_name, path, size, used_space, available_space))
+            # Format size, used space, and available space with appropriate extensions
+            size_formatted = format_bytes(size)
+            used_space_formatted = format_bytes(used_space) if used_space is not None else None
+            available_space_formatted = format_bytes(available_space) if available_space is not None else None
+            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size_formatted, used_space_formatted, available_space_formatted, last_updated)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''', (hostname, app_name, sub_app_name, path, size_formatted, used_space_formatted, available_space_formatted))
         conn.commit()
         print("Data inserted successfully.")
     except pyodbc.Error as e:
@@ -29,55 +30,12 @@ def save_to_db(results):
     finally:
         conn.close()
 
-def get_directories_with_size(config_file):
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['apps_space_monitor']
-
-    results = []
-
-    for app_config in config:
-        app_name = app_config['name']
-        paths = app_config.get('paths', [])
-        threshold = app_config.get('threshold', 0)
-
-        for path_entry in paths:
-            sub_app_name = path_entry['name']
-            path = path_entry['path']
-            size = get_directory_size(path)
-
-            if threshold == 0:
-                total, used, free = shutil.disk_usage(path)
-                used_space = round(used / (1024 ** 3), 2)
-                available_space = round(free / (1024 ** 3), 2)
-                results.append((app_name, sub_app_name, path, size, used_space, available_space))
-            else:
-                results.append((app_name, sub_app_name, path, size, None, None))
-
-    return results
-
-if __name__ == '__main__':
-    Constants = Constants() # Assuming Constants is a class or module containing connection details
-    hostname = socket.gethostname()
-    config_file = 'config.yml'
-    results = get_directories_with_size(config_file)
-
-    if results:
-        save_to_db(results)
-    else:
-        print("No directories found with space more than threshold limit.")
-
-def save_to_db(results):
-    conn = pyodbc.connect(Constants.Connection)
-    cursor = conn.cursor()
-
-    try:
-        for result in results:
-            app_name, sub_app_name, path, size, used_space, available_space = result
-            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size, used_space, available_space, last_updated)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''', (hostname, app_name, sub_app_name, path, size, used_space, available_space))
-        conn.commit()
-        print("Data inserted successfully.")
-    except pyodbc.Error as e:
-        print("Data insertion failed:", e)
-    finally:
-        conn.close()
+def format_bytes(bytes):
+    if bytes is None:
+        return None
+    elif bytes >= 1024 ** 3:  # Gigabytes
+        return f"{round(bytes / (1024 ** 3), 2)} GB"
+    elif bytes >= 1024 ** 2:  # Megabytes
+        return f"{round(bytes / (1024 ** 2), 2)} MB"
+    else:  # Bytes
+        return f"{bytes} bytes"
