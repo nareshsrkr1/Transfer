@@ -51,12 +51,18 @@ def get_directories_with_space(config_file):
         
         for path_entry in app_config.get('paths', []):
             app_path = path_entry['path']
+            threshold = path_entry.get('threshold', 0) * 1024 * 1024 * 1024  # Convert GB to bytes
+            if threshold == 0:
+                continue  # Skip scanning if threshold is 0
             
             if os.path.exists(app_path) and os.path.isdir(app_path):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
                     for result in results:
                         directories_with_space.extend(result)
+                # Calculate space occupied by the path
+                path_size = get_directory_size(app_path)
+                directories_with_space.append((app_path, path_size))
     return directories_with_space
 
 # Function to save results to SQL Server database
