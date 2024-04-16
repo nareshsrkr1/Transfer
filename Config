@@ -65,3 +65,19 @@ if __name__ == '__main__':
         save_to_db(results)
     else:
         print("No directories found with space more than threshold limit.")
+
+def save_to_db(results):
+    conn = pyodbc.connect(Constants.Connection)
+    cursor = conn.cursor()
+
+    try:
+        for result in results:
+            app_name, sub_app_name, path, size, used_space, available_space = result
+            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size, used_space, available_space, last_updated)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)''', (hostname, app_name, sub_app_name, path, size, used_space, available_space))
+        conn.commit()
+        print("Data inserted successfully.")
+    except pyodbc.Error as e:
+        print("Data insertion failed:", e)
+    finally:
+        conn.close()
