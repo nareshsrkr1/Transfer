@@ -5,24 +5,24 @@ import socket
 import subprocess
 from datetime import datetime
 
-def save_to_db(results):
+def save_app_level_info_to_db(results):
     conn = pyodbc.connect(Constants.Connection)
     cursor = conn.cursor()
 
     try:
         for result in results:
-            app_name, path, threshold_size, directories = result
+            app_name, path, num_of_folders, threshold, directories = result
             for directory in directories:
-                cursor.execute('''INSERT INTO app_space_info (app_name, path, directory_name, directory_size, last_updated)
-                                  VALUES (?, ?, ?, ?, ?)''', (app_name, path, directory[0], directory[1], datetime.now()))
+                cursor.execute('''INSERT INTO app_space_info (app_name, path, num_of_folders, threshold, directory_name, directory_size, last_updated)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?)''', (app_name, path, num_of_folders, threshold, directory[0], directory[1], datetime.now()))
         conn.commit()
-        print("Data inserted successfully.")
+        print("App level info inserted successfully.")
     except pyodbc.Error as e:
-        print("Data insertion failed:", e)
+        print("App level info insertion failed:", e)
     finally:
         conn.close()
 
-def get_top_folders_above_threshold(config_file):
+def get_app_level_info(config_file):
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)['apps_space_monitor']
 
@@ -30,8 +30,9 @@ def get_top_folders_above_threshold(config_file):
 
     for app_config in config:
         app_name = app_config['name']
-        paths = app_config.get('paths', [])
+        num_of_folders = app_config.get('num_of_folders', 0)
         threshold = app_config.get('threshold', 0)
+        paths = app_config.get('paths', [])
 
         for path_entry in paths:
             path = path_entry['path']
@@ -62,7 +63,7 @@ def get_top_folders_above_threshold(config_file):
             # Take the top 10 directories if there are more than 10
             top_directories = directories[:10]
 
-            results.append((app_name, path, threshold, top_directories))
+            results.append((app_name, path, num_of_folders, threshold, top_directories))
 
     return results
 
@@ -70,9 +71,9 @@ if __name__ == '__main__':
     Constants = Constants() # Assuming Constants is a class or module containing connection details
     hostname = socket.gethostname()
     config_file = 'config.yml'
-    results = get_top_folders_above_threshold(config_file)
+    results = get_app_level_info(config_file)
 
     if results:
-        save_to_db(results)
+        save_app_level_info_to_db(results)
     else:
         print("No directories found with size above threshold.")
