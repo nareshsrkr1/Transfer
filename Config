@@ -1,11 +1,10 @@
 import os
-import subprocess
 import yaml
+import subprocess
 import concurrent.futures
-from windDownApp.computation import Constants
 import pyodbc
+import socket
 
-# Function to calculate directory size using du -sh
 def get_directory_size(dir_path):
     try:
         du_output = subprocess.check_output(['du', '-sb', dir_path])
@@ -15,77 +14,15 @@ def get_directory_size(dir_path):
     except subprocess.CalledProcessError:
         return -1
 
-# Function to get directories with space exceeding threshold
-def get_directories_with_space(config_file):
-    nas_path = None
-    directories_with_space = []
-
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['apps_space_monitor']
-
-    for app_config in config:
-        app_name = app_config['name']
-        paths = app_config.get('paths', [])
-        threshold_space_limit = app_config.get('threshold', 0) * 1024 * 1024 * 1024  # Convert GB to bytes
-
-        if app_name == 'NAS':
-            nas_path = paths[0]['path'] if paths else None
-            continue
-
-        for path_entry in paths:
-            path_name = path_entry['name']
-            path = path_entry['path']
-
-            if os.path.exists(path) and os.path.isdir(path):
-                app_size = get_directory_size(path)
-                app_used_space = app_size - get_directory_size(os.path.join(path, '*'))
-                directories_with_space.append((app_name, path_name, app_size, app_used_space))
-
-                if threshold_space_limit > 0:
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        results = executor.map(scan_directory, [(path, threshold_space_limit)])
-                        for result in results:
-                            directories_with_space.extend(result)
-
-    if nas_path:
-        nas_size = get_directory_size(nas_path)
-        nas_used_space = nas_size - get_directory_size(os.path.join(nas_path, '*'))
-        directories_with_space.append(('NAS', 'mynas', nas_size, nas_used_space))
-
-    return directories_with_space
-
-# Function to scan a directory and get directories exceeding threshold
-def scan_directory(args):
-    dir_path, threshold_space_limit = args
-    directories_with_space = []
-
-    for root, dirs, files in os.walk(dir_path):
-        for dir_name in dirs:
-            dir_full_path = os.path.join(root, dir_name)
-            dir_size = get_directory_size(dir_full_path)
-            if dir_size > threshold_space_limit:
-                directories_with_space.append((dir_full_path, dir_size))
-                if len(directories_with_space) >= 10:
-                    return directories_with_space  # Stop if 10 directories found
-    return directories_with_space
-
-# Function to save results to SQL Server database
 def save_to_db(results):
     conn = pyodbc.connect(Constants.Connection)
-
     cursor = conn.cursor()
 
     try:
-        for app_name, path_name, occupied_space, used_space in results:
-            table_name = f'{app_name}_directory_space'
-            cursor.execute(f'''IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '{table_name}')
-                                CREATE TABLE {table_name} (
-                                    id INT IDENTITY(1,1) PRIMARY KEY,
-                                    sub_app_path VARCHAR(255),
-                                    occupied_space_gb FLOAT
-                                )''')
-            cursor.execute(f'''INSERT INTO {table_name} (sub_app_path, occupied_space_gb)
-                                VALUES (?, ?)''', (path_name, round(occupied_space / (1024 ** 3), 2)))
+        for result in results:
+            app_name, sub_app_name, path, size, used_space = result
+            cursor.execute('''INSERT INTO directory_sizes (hostname, app_name, sub_app_name, path, size, used_space)
+                              VALUES (?, ?, ?, ?, ?, ?)''', (hostname, app_name, sub_app_name, path, size, used_space))
         conn.commit()
         print("Data inserted successfully.")
     except pyodbc.Error as e:
@@ -93,13 +30,40 @@ def save_to_db(results):
     finally:
         conn.close()
 
-# Example usage
+def get_directories_with_size(config_file):
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)['apps_space_monitor']
+
+    results = []
+
+    for app_config in config:
+        app_name = app_config['name']
+        paths = app_config.get('paths', [])
+        threshold = app_config.get('threshold', 0)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_path = {executor.submit(get_directory_size, path_entry['path']): path_entry for path_entry in paths}
+            for future in concurrent.futures.as_completed(future_to_path):
+                path_entry = future_to_path[future]
+                sub_app_name = path_entry['name']
+                path = path_entry['path']
+                size = future.result()
+                if threshold == 0:
+                    total, used, free = shutil.disk_usage(path)
+                    used_space = round(used / (1024 ** 3), 2)
+                    results.append((app_name, sub_app_name, path, size, used_space))
+                else:
+                    results.append((app_name, sub_app_name, path, size, None))
+
+    return results
+
 if __name__ == '__main__':
+    Constants = Constants() # Assuming Constants is a class or module containing connection details
+    hostname = socket.gethostname()
     config_file = 'config.yml'
-    results = get_directories_with_space(config_file)
+    results = get_directories_with_size(config_file)
 
     if results:
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            executor.map(save_to_db, [results])
+        save_to_db(results)
     else:
         print("No directories found with space more than threshold limit.")
