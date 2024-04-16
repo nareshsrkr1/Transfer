@@ -62,7 +62,7 @@ def get_directories_with_space(config_file):
                         directories_with_space.extend(result)
                 # Calculate space occupied by the path
                 path_size = get_directory_size(app_path)
-                directories_with_space.append((app_path, path_size))
+                directories_with_space.append((app_name, app_path, path_size))
     return directories_with_space
 
 # Function to save results to SQL Server database
@@ -74,11 +74,8 @@ def save_to_db(results):
     try:
         cursor.execute('''CREATE TABLE directory_space (
                             id INT IDENTITY(1,1) PRIMARY KEY,
-                            servername VARCHAR(100),
                             app_name VARCHAR(100),
-                            sub_app_path VARCHAR(100),
-                            absolute_path VARCHAR(255),
-                            free_space_gb FLOAT,
+                            sub_app_path VARCHAR(255),
                             occupied_space_gb FLOAT
                         )''')
         print("Table created successfully.")
@@ -87,17 +84,12 @@ def save_to_db(results):
 
     try:
         for result in results:
-            servername = 'your_servername'  # Change this to your server name
             app_name = result[0]
             sub_app_path = result[1]
-            absolute_path = result[2]
-            free_space_gb = round((result[3] - result[4]) / (1024 ** 3), 2)
-            occupied_space_gb = round(result[4] / (1024 ** 3), 2)
+            occupied_space_gb = round(result[2] / (1024 ** 3), 2)
 
-            cursor.execute('''INSERT INTO directory_space (servername, app_name, sub_app_path, absolute_path,
-                                                            free_space_gb, occupied_space_gb)
-                              VALUES (?, ?, ?, ?, ?, ?)''', (servername, app_name, sub_app_path, absolute_path,
-                                                            free_space_gb, occupied_space_gb))
+            cursor.execute('''INSERT INTO directory_space (app_name, sub_app_path, occupied_space_gb)
+                              VALUES (?, ?, ?)''', (app_name, sub_app_path, occupied_space_gb))
         conn.commit()
         print("Data inserted successfully.")
     except pyodbc.Error as e:
