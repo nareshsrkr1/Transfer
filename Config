@@ -2,6 +2,7 @@ import os
 import subprocess
 import yaml
 import concurrent.futures
+from windDownApp.computation import Constants
 import pyodbc
 
 # Function to calculate directory size using du -sh
@@ -43,7 +44,7 @@ def get_directories_with_space(config_file):
     directories_with_space = []
 
     with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['app_space_monitor']
+        config = yaml.safe_load(f)['apps_space_monitor']  # Corrected from 'app_space_monitor'
 
     for app_config in config:
         app_name = app_config['name']
@@ -53,22 +54,24 @@ def get_directories_with_space(config_file):
             app_path = path_entry['path']
             threshold = path_entry.get('threshold', 0) * 1024 * 1024 * 1024  # Convert GB to bytes
             if threshold == 0:
-                continue  # Skip scanning if threshold is 0
-            
-            if os.path.exists(app_path) and os.path.isdir(app_path):
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
-                    for result in results:
-                        directories_with_space.extend(result)
-                # Calculate space occupied by the path
-                path_size = get_directory_size(app_path)
-                directories_with_space.append((app_name, app_path, path_size))
+                if os.path.exists(app_path) and os.path.isdir(app_path):
+                    path_size = get_directory_size(app_path)
+                    directories_with_space.append((app_name, app_path, path_size))
+            else:
+                if os.path.exists(app_path) and os.path.isdir(app_path):
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
+                        for result in results:
+                            directories_with_space.extend(result)
+                    # Calculate space occupied by the path
+                    path_size = get_directory_size(app_path)
+                    directories_with_space.append((app_name, app_path, path_size))
     return directories_with_space
 
 # Function to save results to SQL Server database
 def save_to_db(results):
-    conn_str = 'DRIVER={SQL Server};SERVER=your_server;DATABASE=your_database;UID=your_username;PWD=your_password'
-    conn = pyodbc.connect(conn_str)
+    conn = pyodbc.connect(Constants.Connection)
+
     cursor = conn.cursor()
 
     try:
