@@ -17,32 +17,41 @@ def get_directory_size(dir_path):
 
 # Function to get directories with space exceeding threshold
 def get_directories_with_space(config_file):
+    nas_path = None
     directories_with_space = []
-
-    nas_path = Constants.NasPath
-    nas_size = get_directory_size(nas_path)
-    nas_used_space = nas_size - get_directory_size(os.path.join(nas_path, '*'))
 
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)['apps_space_monitor']
 
     for app_config in config:
         app_name = app_config['name']
-        app_path = app_config['path']
-        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
+        paths = app_config.get('paths', [])
+        threshold_space_limit = app_config.get('threshold', 0) * 1024 * 1024 * 1024  # Convert GB to bytes
 
-        if os.path.exists(app_path) and os.path.isdir(app_path):
-            app_size = get_directory_size(app_path)
-            app_used_space = app_size - get_directory_size(os.path.join(app_path, '*'))
-            directories_with_space.append((app_name, app_path, app_size, app_used_space))
+        if app_name == 'NAS':
+            nas_path = paths[0]['path'] if paths else None
+            continue
 
-            if threshold_space_limit > 0:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
-                    for result in results:
-                        directories_with_space.extend(result)
+        for path_entry in paths:
+            path_name = path_entry['name']
+            path = path_entry['path']
 
-    directories_with_space.append(('Nas', nas_path, nas_size, nas_used_space))
+            if os.path.exists(path) and os.path.isdir(path):
+                app_size = get_directory_size(path)
+                app_used_space = app_size - get_directory_size(os.path.join(path, '*'))
+                directories_with_space.append((app_name, path_name, app_size, app_used_space))
+
+                if threshold_space_limit > 0:
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        results = executor.map(scan_directory, [(path, threshold_space_limit)])
+                        for result in results:
+                            directories_with_space.extend(result)
+
+    if nas_path:
+        nas_size = get_directory_size(nas_path)
+        nas_used_space = nas_size - get_directory_size(os.path.join(nas_path, '*'))
+        directories_with_space.append(('NAS', 'mynas', nas_size, nas_used_space))
+
     return directories_with_space
 
 # Function to scan a directory and get directories exceeding threshold
@@ -67,24 +76,16 @@ def save_to_db(results):
     cursor = conn.cursor()
 
     try:
-        cursor.execute('''CREATE TABLE directory_space (
-                            id INT IDENTITY(1,1) PRIMARY KEY,
-                            app_name VARCHAR(100),
-                            sub_app_path VARCHAR(255),
-                            occupied_space_gb FLOAT
-                        )''')
-        print("Table created successfully.")
-    except pyodbc.Error as e:
-        print("Table creation failed:", e)
-
-    try:
-        for result in results:
-            app_name = result[0]
-            sub_app_path = result[1]
-            occupied_space_gb = round(result[2] / (1024 ** 3), 2)
-
-            cursor.execute('''INSERT INTO directory_space (app_name, sub_app_path, occupied_space_gb)
-                              VALUES (?, ?, ?)''', (app_name, sub_app_path, occupied_space_gb))
+        for app_name, path_name, occupied_space, used_space in results:
+            table_name = f'{app_name}_directory_space'
+            cursor.execute(f'''IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '{table_name}')
+                                CREATE TABLE {table_name} (
+                                    id INT IDENTITY(1,1) PRIMARY KEY,
+                                    sub_app_path VARCHAR(255),
+                                    occupied_space_gb FLOAT
+                                )''')
+            cursor.execute(f'''INSERT INTO {table_name} (sub_app_path, occupied_space_gb)
+                                VALUES (?, ?)''', (path_name, round(occupied_space / (1024 ** 3), 2)))
         conn.commit()
         print("Data inserted successfully.")
     except pyodbc.Error as e:
