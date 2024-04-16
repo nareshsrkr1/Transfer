@@ -8,21 +8,42 @@ import pyodbc
 # Function to calculate directory size using du -sh
 def get_directory_size(dir_path):
     try:
-        du_output = subprocess.check_output(['du', '-sh', dir_path])
+        du_output = subprocess.check_output(['du', '-sb', dir_path])
         size_str, _ = du_output.split(maxsplit=1)
         size_str = size_str.decode('utf-8').strip()
-        size, unit = float(size_str[:-1]), size_str[-1]
-        if unit == 'K':
-            size *= 1024
-        elif unit == 'M':
-            size *= 1024 * 1024
-        elif unit == 'G':
-            size *= 1024 * 1024 * 1024
-        elif unit == 'T':
-            size *= 1024 * 1024 * 1024 * 1024
-        return int(size)
+        return int(size_str.split()[0])
     except subprocess.CalledProcessError:
         return -1
+
+# Function to get directories with space exceeding threshold
+def get_directories_with_space(config_file):
+    directories_with_space = []
+
+    nas_path = Constants.NasPath
+    nas_size = get_directory_size(nas_path)
+    nas_used_space = nas_size - get_directory_size(os.path.join(nas_path, '*'))
+
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)['apps_space_monitor']
+
+    for app_config in config:
+        app_name = app_config['name']
+        app_path = app_config['path']
+        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
+
+        if os.path.exists(app_path) and os.path.isdir(app_path):
+            app_size = get_directory_size(app_path)
+            app_used_space = app_size - get_directory_size(os.path.join(app_path, '*'))
+            directories_with_space.append((app_name, app_path, app_size, app_used_space))
+
+            if threshold_space_limit > 0:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
+                    for result in results:
+                        directories_with_space.extend(result)
+
+    directories_with_space.append(('Nas', nas_path, nas_size, nas_used_space))
+    return directories_with_space
 
 # Function to scan a directory and get directories exceeding threshold
 def scan_directory(args):
@@ -37,35 +58,6 @@ def scan_directory(args):
                 directories_with_space.append((dir_full_path, dir_size))
                 if len(directories_with_space) >= 10:
                     return directories_with_space  # Stop if 10 directories found
-    return directories_with_space
-
-# Function to get directories with space exceeding threshold
-def get_directories_with_space(config_file):
-    directories_with_space = []
-
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)['apps_space_monitor']  # Corrected from 'app_space_monitor'
-
-    for app_config in config:
-        app_name = app_config['name']
-        threshold_space_limit = app_config['threshold'] * 1024 * 1024 * 1024  # Convert GB to bytes
-        
-        for path_entry in app_config.get('paths', []):
-            app_path = path_entry['path']
-            threshold = path_entry.get('threshold', 0) * 1024 * 1024 * 1024  # Convert GB to bytes
-            if threshold == 0:
-                if os.path.exists(app_path) and os.path.isdir(app_path):
-                    path_size = get_directory_size(app_path)
-                    directories_with_space.append((app_name, app_path, path_size))
-            else:
-                if os.path.exists(app_path) and os.path.isdir(app_path):
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        results = executor.map(scan_directory, [(app_path, threshold_space_limit)])
-                        for result in results:
-                            directories_with_space.extend(result)
-                    # Calculate space occupied by the path
-                    path_size = get_directory_size(app_path)
-                    directories_with_space.append((app_name, app_path, path_size))
     return directories_with_space
 
 # Function to save results to SQL Server database
