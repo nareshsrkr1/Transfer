@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Read configuration from config.ini
-source_dir=$(awk -F ' = ' '/\[directories\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
-destination_dir=$(awk -F ' = ' '/\[directories\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
-input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF{print $NF}' config.ini)
+source_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
+destination_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
+input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
 
 # Ensure the destination directory exists
 mkdir -p "$destination_dir"
