@@ -3,12 +3,22 @@
 # Read configuration from config.ini
 source_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
 destination_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
-input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
+input_file_start=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
 
 # Ensure the destination directory exists
 mkdir -p "$destination_dir"
 
-# Tar all files directly into one archive
-tar -czf "$destination_dir/all_files.tar.gz" $(find "$source_dir" -maxdepth 1 -type f -name "$input_files")
+# Get the current date and time
+current_datetime=$(date +"%Y%m%d%H%M%S")
 
-echo "Processing complete."
+# Find files starting with the input file pattern
+matching_files=$(find "$source_dir" -maxdepth 1 -type f -print | grep -E "$(echo "$input_file_start" | sed 's/ /$\\|/g')")
+
+# Check if there are any matching files
+if [ -n "$matching_files" ]; then
+    # Tar all matching files into one archive with date and time appended
+    echo "$matching_files" | xargs tar -czf "$destination_dir/all_files_${current_datetime}.tar.gz"
+    echo "Processing complete."
+else
+    echo "No files starting with the pattern '$input_file_start' found in '$source_dir'."
+fi
