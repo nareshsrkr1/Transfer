@@ -3,7 +3,7 @@
 # Read configuration from config.ini
 source_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
 destination_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
-input_file_start=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
+input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
 
 # Ensure the destination directory exists
 mkdir -p "$destination_dir"
@@ -11,14 +11,21 @@ mkdir -p "$destination_dir"
 # Get the current date and time
 current_datetime=$(date +"%Y%m%d%H%M%S")
 
-# Find files starting with the input file pattern
-matching_files=$(find "$source_dir" -maxdepth 1 -type f -print | grep -E "$(echo "$input_file_start" | sed 's/ /$\\|/g')")
+# Initialize an array to store matching files
+declare -a matching_files_array
+
+# Loop through each input file pattern
+for input_file_pattern in $(echo "$input_files" | tr ',' '\n'); do
+    # Find files matching the current pattern and add them to the array
+    matching_files=$(find "$source_dir" -maxdepth 1 -type f -name "$input_file_pattern" -print)
+    matching_files_array+=($matching_files)
+done
 
 # Check if there are any matching files
-if [ -n "$matching_files" ]; then
+if [ ${#matching_files_array[@]} -gt 0 ]; then
     # Tar all matching files into one archive with date and time appended
-    echo "$matching_files" | xargs tar -czf "$destination_dir/all_files_${current_datetime}.tar.gz"
+    tar -czf "$destination_dir/all_files_${current_datetime}.tar.gz" "${matching_files_array[@]}"
     echo "Processing complete."
 else
-    echo "No files starting with the pattern '$input_file_start' found in '$source_dir'."
+    echo "No files matching the patterns '$input_files' found in '$source_dir'."
 fi
