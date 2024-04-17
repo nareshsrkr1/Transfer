@@ -1,28 +1,34 @@
-import subprocess
+#!/bin/bash
 
-def get_top_directories(path, num_top_directories=10):
-    try:
-        # Execute the du -h command to get directory sizes
-        du_output = subprocess.check_output(['du', '-h', path]).decode('utf-8')
-        # Execute the sort -rh command to sort the output in reverse human-readable format
-        sort_output = subprocess.check_output(['sort', '-rh'], input=du_output.encode('utf-8')).decode('utf-8')
-        # Execute the head -n command to get the top N directories
-        head_output = subprocess.check_output(['head', '-n', str(num_top_directories)], input=sort_output.encode('utf-8')).decode('utf-8')
-        # Parse the output to extract directory sizes and names
-        top_directories = []
-        for line in head_output.split('\n'):
-            if line:
-                size_str, dir_name = line.split('\t')
-                size = size_str.strip()  # Remove leading/trailing whitespace
-                top_directories.append((size, dir_name))
-        return top_directories
-    except subprocess.CalledProcessError as e:
-        print(f"Error retrieving top directories for path {path}: {e}")
-        return []
+# Read configuration from config.ini
+source_dir=$(awk -F ' = ' '/\[directories\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
+destination_dir=$(awk -F ' = ' '/\[directories\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
+input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF{print $NF}' config.ini)
 
-# Example usage
-path = '/path/to/directory'
-top_directories = get_top_directories(path)
-print("Top 10 directories with maximum occupancy:")
-for size, dir_name in top_directories:
-    print(f"Size: {size}, Directory: {dir_name}")
+# Ensure the destination directory exists
+mkdir -p "$destination_dir"
+
+# Iterate through .dat files specified in the configuration
+for dat_file in $(echo "$input_files" | tr ',' '\n'); do
+    # Construct the full path of the .dat file
+    dat_file_path="$source_dir/$dat_file"
+
+    # Check if the file exists
+    if [ -e "$dat_file_path" ]; then
+        # Get the base filename without extension
+        base_filename=$(basename "$dat_file" .dat)
+
+        # Zip the file
+        zip "$destination_dir/$base_filename.zip" "$dat_file_path"
+
+        # Tar and gzip the file
+        tar -czf "$destination_dir/$base_filename.tar.gz" -C "$source_dir" "$dat_file"
+
+        # Optionally, remove the original .dat file
+        # rm "$dat_file_path"
+    else
+        echo "File '$dat_file' does not exist."
+    fi
+done
+
+echo "Processing complete."
