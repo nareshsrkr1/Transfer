@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Read configuration from config.ini
-source_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/source_dir/{print $NF}' config.ini)
-destination_dir=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/destination_dir/{print $NF}' config.ini)
-input_files=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&/files/{print $NF}' config.ini)
+# Define destination directory manually
+destination_dir="/path/to/destination/directory"
 
 # Ensure the destination directory exists
 mkdir -p "$destination_dir"
@@ -11,13 +9,20 @@ mkdir -p "$destination_dir"
 # Get the current date and time
 current_datetime=$(date +"%Y%m%d%H%M%S")
 
-# Split input files into an array
-IFS=',' read -ra input_files_array <<< "$input_files"
+# Specify the input files patterns
+input_files="caasi_gl*, 1mcr*"
+
+# Define the environment variable for the source directory
+source_env_var=$(echo "$Env" | tr '[:lower:]' '[:upper:]')
+
+# Construct the source directory path including the environment variable
+source_dir="$source_env_var/path/to/source/directory"
 
 # Initialize an array to store matching files
 declare -a matching_files_array
 
 # Loop through each input file pattern
+IFS=', ' read -ra input_files_array <<< "$input_files"
 for input_file_pattern in "${input_files_array[@]}"; do
     # Find files matching the current pattern in the specified source directory
     matching_files=$(find "$source_dir" -maxdepth 1 -type f -name "$input_file_pattern" -print)
@@ -28,7 +33,16 @@ done
 if [ ${#matching_files_array[@]} -gt 0 ]; then
     # Tar all matching files into one archive with date and time appended
     tar -czf "$destination_dir/all_files_${current_datetime}.tar.gz" "${matching_files_array[@]}"
-    echo "Processing complete."
+    
+    # Check if tar was successful
+    if [ $? -eq 0 ]; then
+        echo "Tar creation successful. Deleting files..."
+        # Delete the matching files
+        rm -f "${matching_files_array[@]}"
+        echo "Files deleted successfully."
+    else
+        echo "Tar creation failed. Files not deleted."
+    fi
 else
     echo "No matching files found in '$source_dir' for the patterns: '$input_files'"
 fi
