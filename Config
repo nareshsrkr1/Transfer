@@ -24,7 +24,11 @@ for input_file_pattern in "${input_files_array[@]}"; do
     matching_files_array+=($matching_files)
 done
 
-# Echo the matching files array
-for file in "${matching_files_array[@]}"; do
-    echo "$file"
-done
+# Check if there are any matching files
+if [ ${#matching_files_array[@]} -gt 0 ]; then
+    # Tar all matching files into one archive with date and time appended
+    tar -czf "$destination_dir/all_files_${current_datetime}.tar.gz" "${matching_files_array[@]}"
+    echo "Processing complete."
+else
+    echo "No matching files found in '$source_dir' for the patterns: '$input_files'"
+fi
