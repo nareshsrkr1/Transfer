@@ -1,21 +1,7 @@
 #!/bin/bash
 
-count=0
-for dir in /data/*; do
-    if [ "$count" -ge 10 ]; then
-        break
-    fi
-    parent_size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
-    parent_size_numeric=$(echo "$parent_size" | sed 's/G//')
-    if [[ "$parent_size_numeric" -ge 10 ]]; then
-        (
-            du_output=$(du -sh "$dir"/* 2>/dev/null)
-            size=$(echo "$du_output" | awk '{print $1}')
-            if [[ "$size" =~ G && "${size/G/}" -gt 10 ]]; then
-                echo "$dir: $size"
-                ((count++))
-            fi
-        ) &
-    fi
-done
-wait
+# Define the number of processes to run in parallel
+NUM_PROCESSES=$(nproc)
+
+# Use find to find all directories under /data, then use xargs to execute du in parallel, sort the output, and get the top 10
+find /data -type d | xargs -P $NUM_PROCESSES -I {} du -h {} 2>/dev/null | sort -rh | head -n 10
