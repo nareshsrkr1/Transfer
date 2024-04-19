@@ -1,1 +1,15 @@
 parameter_value=$(awk -F '= ' '/\[input_files\]/{f=1; next} /\[.*\]/{f=0} f&&NF&&$0 ~ "^'"$1"'"{print $NF}' config.ini)
+
+#!/bin/bash
+
+count=0
+for dir in /data/*; do
+    size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
+    if [[ "$size" =~ G && "${size/G/}" -gt 10 ]]; then
+        echo "$dir: $size"
+        ((count++))
+    fi
+    if [ "$count" -eq 10 ]; then
+        break
+    fi
+done
