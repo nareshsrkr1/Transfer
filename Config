@@ -11,4 +11,4 @@ for dir in /data/*; do
         echo "$dir: $size"
         ((count++))
     fi
-done | parallel -j10
+done | xargs -I{} -P10 bash -c 'echo "{}"'
