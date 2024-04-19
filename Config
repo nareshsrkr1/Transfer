@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Define the number of processes to run in parallel
+# Get the number of available processing cores
 NUM_PROCESSES=$(nproc)
 
-# Use find to find all directories under /data, then use xargs to execute du in parallel, sort the output, and get the top 10
-find /data -type d | xargs -P $NUM_PROCESSES -I {} du -h {} 2>/dev/null | sort -rh | head -n 10
+# Use 'find' to locate directories and 'du' to calculate their size in parallel
+# Use 'awk' to print only the size and path, which makes sorting by size faster
+# Sort the results numerically and reverse the order to get the largest directories first
+# Then display the top 10 results
+find /data -type d -print0 | xargs -0 -P $NUM_PROCESSES -I {} sh -c 'du -hs "$1" | awk "{print \\\$1,\\\$2}"' _ {} 2>/dev/null | sort -rh | head -n 10
