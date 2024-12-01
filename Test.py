@@ -8,7 +8,7 @@ SET
     RWA_SACCR_FLAG = CASE 
         WHEN saccr_leg.stdAllocatedRwa IS NOT NULL OR saccr_trans.stdAllocatedRwa IS NOT NULL 
         THEN 'Y' 
-        ELSE RWA_SACCR_FLAG -- Retain existing value
+        ELSE 'N' 
     END
 FROM 
     unfd_positions_dt unfd
