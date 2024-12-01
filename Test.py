@@ -1,26 +1,16 @@
-#!/bin/bash
-
-# Check if a filename is provided as an argument
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <filename>"
-    exit 1
-fi
-
-filename=$1
-
-# Check if the file exists
-if [ ! -f "$filename" ]; then
-    echo "File $filename not found!"
-    exit 1
-fi
-
-# Read the file line by line, trim leading/trailing spaces, and echo non-empty lines
-while IFS= read -r line; do
-    # Trim leading and trailing whitespace
-    trimmed_line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-    
-    # Check if the trimmed line is not empty
-    if [ -n "$trimmed_line" ]; then
-        echo "$trimmed_line"
-    fi
-done < "$filename"
+-- Update unfd table with data from saccr based on legTransactionId or transactionId
+UPDATE unfd_positions_dt AS unfd
+SET 
+    CCR_RWA = COALESCE(saccr_leg.stdAllocatedRwa, saccr_trans.stdAllocatedRwa),
+    RWA_SACCR_FLAG = CASE 
+        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL OR saccr_trans.stdAllocatedRwa IS NOT NULL 
+        THEN 'Y' 
+        ELSE 'N' 
+    END
+FROM 
+    saccr_rwa_ead_data saccr_leg
+    FULL OUTER JOIN saccr_rwa_ead_data saccr_trans
+    ON saccr_leg.transactionId = saccr_trans.transactionId
+WHERE 
+    unfd.Transaction_ID_FACS = saccr_leg.legTransactionId
+    OR unfd.Transaction_ID_FACS = saccr_trans.transactionId;
