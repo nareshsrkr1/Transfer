@@ -54,19 +54,19 @@ SELECT
     up.DnT_Product_Type,
     up.Maturity_Bucket,
     up.Local_Currency,
-    wpd.Transaction_Type,
+    COALESCE(wpd.Transaction_Type, up.Derivative_Transaction_Channel) AS Transaction_Type,
     up.Collateralization,
-    wpd.CounterParty_Type,
+    COALESCE(wpd.CounterParty_Type, up.CounterParty_Type) AS CounterParty_Type,
     up.Product_Liquidity,
     up.Trade_count,
     up.TotalTrade_pct,
     up.Notional,
     up.NPV,
     up.Exit_Strategy_Default,
-    wpd.Exit_Strategy AS Exit_Strategy_new,
+    COALESCE(wpd.Exit_Strategy, up.Exit_Strategy_Default) AS Exit_Strategy_Final,
     wpd.Exit_Strategy_BusinessOverride AS Exit_Strategy_Override,
     up.Exit_phase_Default,
-    wpd.Exit_phase AS Exit_phase_new,
+    COALESCE(wpd.Exit_phase, up.Exit_phase_Default) AS Exit_phase_Final,
     wpd.Exit_phase_BusinessOverride AS Exit_phase_Override,
     wpd.Business_Input AS Business_Input_new,
     wpd.Business_Input_BusinessOverride AS Business_Input_Override,
@@ -77,7 +77,7 @@ SELECT
     wpd.HashID,
     wpd.SegmentationID
 FROM unifiedPositions up
-INNER JOIN windDownParams_Override wpd
+LEFT JOIN windDownParams_Override wpd
     ON up.Business_Name = wpd.Business_Name
     AND up.Records_Entity_Name = wpd.Records_Entity_Name
     AND up.DnT_Product_Type = wpd.DnTProduct_Type
