@@ -1,20 +1,20 @@
-def build_dynamic_query_with_explicit_aliases(
+def build_dynamic_join_conditions(mapped_segmentation_columns):
+    """
+    Build dynamic join conditions based on mapped columns.
+    """
+    join_conditions = [
+        f"up.{unfd_col} = wpd.{override_col}"
+        for unfd_col, override_col in mapped_segmentation_columns
+    ]
+    return " AND\n    ".join(join_conditions)
+
+def build_dynamic_query(
     static_columns,
     mapped_segmentation_columns,
     aggregations,
-    join_conditions,
 ):
     """
-    Build a dynamic SQL query, ensuring all columns are prefixed with explicit table aliases.
-
-    Args:
-        static_columns: List of static column names (from `UNFD`).
-        mapped_segmentation_columns: List of (unfd_column, override_column) tuples.
-        aggregations: Dictionary of aggregation columns and their SQL logic.
-        join_conditions: List of join conditions between UNFD and Override tables.
-
-    Returns:
-        A dynamically generated SQL query as a string.
+    Build a dynamic SQL query with explicit joins and column mappings.
     """
     # Prefix static columns with "up."
     prefixed_static_columns = [f"up.{col}" for col in static_columns]
@@ -29,10 +29,8 @@ def build_dynamic_query_with_explicit_aliases(
         prefixed_static_columns + prefixed_mapped_columns + list(aggregations.values())
     )
 
-    # Build the JOIN clause
-    join_clause = " AND\n    ".join(
-        [f"up.{unfd_col} = wpd.{override_col}" for unfd_col, override_col in join_conditions]
-    )
+    # Build the JOIN clause dynamically
+    join_clause = build_dynamic_join_conditions(mapped_segmentation_columns)
 
     query = f"""
     WITH unifiedPositions AS (
@@ -51,3 +49,27 @@ def build_dynamic_query_with_explicit_aliases(
     WHERE up.Business_Name = 'CMBS Trading';
     """
     return query
+
+
+from sqlalchemy import create_engine
+from constants import STATIC_COLUMNS, AGGREGATIONS
+import pandas as pd
+
+# Create a database connection
+engine = create_engine("your_database_connection_string")
+
+# Fetch active columns
+segmentation_columns = get_active_columns(engine, "config_dynamic_segmentation")
+
+# Fetch column mappings filtered by selected columns
+mapped_segmentation_columns = get_column_mapping(engine, segmentation_columns)
+
+# Build the dynamic query
+query = build_dynamic_query(
+    static_columns=STATIC_COLUMNS,
+    mapped_segmentation_columns=mapped_segmentation_columns,
+    aggregations=AGGREGATIONS,
+)
+
+# Print the final query
+print(query)
