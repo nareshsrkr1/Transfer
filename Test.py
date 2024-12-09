@@ -1,52 +1,53 @@
-def build_dynamic_query_with_mapping(segmentation_columns, override_columns, static_columns, aggregations, column_mapping):
+def build_dynamic_query_with_explicit_aliases(
+    static_columns,
+    mapped_segmentation_columns,
+    aggregations,
+    join_conditions,
+):
     """
-    Builds the dynamic query with proper mapping for UNFD and Override columns.
-    
+    Build a dynamic SQL query, ensuring all columns are prefixed with explicit table aliases.
+
     Args:
-        segmentation_columns (list): Active columns for segmentation.
-        override_columns (list): Override-specific columns.
-        static_columns (list): Static columns to always include.
-        aggregations (dict): Aggregations to include in the query.
-        column_mapping (dict): Mapping between UNFD and Override columns.
-    
+        static_columns: List of static column names (from `UNFD`).
+        mapped_segmentation_columns: List of (unfd_column, override_column) tuples.
+        aggregations: Dictionary of aggregation columns and their SQL logic.
+        join_conditions: List of join conditions between UNFD and Override tables.
+
     Returns:
-        str: The dynamically generated SQL query.
+        A dynamically generated SQL query as a string.
     """
-    # Map segmentation columns and static columns
-    mapped_segmentation_columns = [
-        f"{unfd_col} AS {override_col}" if override_col in column_mapping.values() else unfd_col
-        for unfd_col, override_col in column_mapping.items()
-        if unfd_col in segmentation_columns
+    # Prefix static columns with "up."
+    prefixed_static_columns = [f"up.{col}" for col in static_columns]
+
+    # Prefix mapped segmentation columns with explicit aliases
+    prefixed_mapped_columns = [
+        f"up.{unfd_col} AS {override_col}" for unfd_col, override_col in mapped_segmentation_columns
     ]
 
     # Build the SELECT clause
     select_clause = ",\n    ".join(
-        static_columns +
-        mapped_segmentation_columns +
-        [f"{agg}({col}) AS {alias}" for col, (agg, alias) in aggregations.items()]
+        prefixed_static_columns + prefixed_mapped_columns + list(aggregations.values())
     )
 
-    # Build the JOIN condition
-    join_conditions = [
-        f"up.{unfd_col} = wpd.{override_col}" 
-        for unfd_col, override_col in column_mapping.items() 
-        if unfd_col in segmentation_columns and override_col in override_columns
-    ]
-    
-    # Assemble the query
+    # Build the JOIN clause
+    join_clause = " AND\n    ".join(
+        [f"up.{unfd_col} = wpd.{override_col}" for unfd_col, override_col in join_conditions]
+    )
+
     query = f"""
     WITH unifiedPositions AS (
-        SELECT
-            {select_clause}
-        FROM UNFD_POSITIONS_DT
-        GROUP BY
-            {", ".join(segmentation_columns)}
+        SELECT 
+            {",\n            ".join(prefixed_static_columns)},
+            {",\n            ".join(aggregations.values())}
+        FROM UNFD_POSITIONS_DT up
+        GROUP BY 
+            {", ".join(prefixed_static_columns)}
     )
-    SELECT
+    SELECT 
         {select_clause}
     FROM unifiedPositions up
     LEFT JOIN windDownParams_Override wpd
-        ON {' AND '.join(join_conditions)}
+        ON {join_clause}
     WHERE up.Business_Name = 'CMBS Trading';
     """
     return query
