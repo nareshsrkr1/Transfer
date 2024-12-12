@@ -1,24 +1,24 @@
 WITH Saccr_Leg_Sum AS (
     SELECT 
         LEFT(legTransactionId, CHARINDEX('.', legTransactionId) - 1) AS Base_TransactionId,
-        SUM(CAST(stdAllocatedRwa AS FLOAT)) AS TotalLegRwa
+        SUM(TRY_CAST(stdAllocatedRwa AS FLOAT)) AS TotalLegRwa
     FROM saccr_rwa_ead_data
-    WHERE CHARINDEX('.', legTransactionId) > 0  -- Only consider split IDs
+    WHERE CHARINDEX('.', legTransactionId) > 0
     GROUP BY LEFT(legTransactionId, CHARINDEX('.', legTransactionId) - 1)
 )
 UPDATE unfd_positions_dt
 SET 
     CCR_RWA = CASE
-        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL THEN CAST(saccr_leg.stdAllocatedRwa AS FLOAT)  -- First priority: Direct match on legTransactionId
-        WHEN saccr_leg_agg.TotalLegRwa IS NOT NULL THEN saccr_leg_agg.TotalLegRwa                 -- Second priority: Aggregated match on split legTransactionId
-        WHEN saccr_trans.stdAllocatedRwa IS NOT NULL THEN CAST(saccr_trans.stdAllocatedRwa AS FLOAT) -- Third priority: Direct match on transactionId
-        ELSE CCR_RWA  -- Keep existing value if no match
+        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL THEN TRY_CAST(saccr_leg.stdAllocatedRwa AS FLOAT)  -- Direct match on legTransactionId
+        WHEN saccr_leg_agg.TotalLegRwa IS NOT NULL THEN saccr_leg_agg.TotalLegRwa                     -- Aggregated match on split legTransactionId
+        WHEN saccr_trans.stdAllocatedRwa IS NOT NULL THEN TRY_CAST(saccr_trans.stdAllocatedRwa AS FLOAT) -- Direct match on transactionId
+        ELSE TRY_CAST(CCR_RWA AS FLOAT)  -- Ensure ELSE condition preserves standard format
     END,
     RWA_SACCR_FLAG = CASE
-        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL THEN 'Y'  -- Direct match on legTransactionId
-        WHEN saccr_leg_agg.TotalLegRwa IS NOT NULL THEN 'Y'  -- Aggregated match
-        WHEN saccr_trans.stdAllocatedRwa IS NOT NULL THEN 'Y' -- Direct match on transactionId
-        ELSE 'N'  -- No match
+        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL THEN 'Y'
+        WHEN saccr_leg_agg.TotalLegRwa IS NOT NULL THEN 'Y'
+        WHEN saccr_trans.stdAllocatedRwa IS NOT NULL THEN 'Y'
+        ELSE 'N'
     END
 FROM 
     unfd_positions_dt unfd
