@@ -1,10 +1,29 @@
-#!/bin/bash
-
-# Get the number of available processing cores
-NUM_PROCESSES=$(nproc)
-
-# Use 'find' to locate directories and 'du' to calculate their size in parallel
-# Use 'awk' to print only the size and path, which makes sorting by size faster
-# Sort the results numerically and reverse the order to get the largest directories first
-# Then display the top 10 results
-find /data -type d -print0 | xargs -0 -P $NUM_PROCESSES -I {} sh -c 'du -hs "$1" | awk "{print \\\$1,\\\$2}"' _ {} 2>/dev/null | sort -rh | head -n 10
+WITH Saccr_Leg_Sum AS (
+    SELECT 
+        SUBSTRING_INDEX(legTransactionId, '.', 1) AS Base_TransactionId,
+        SUM(stdAllocatedRwa) AS TotalLegRwa
+    FROM saccr_rwa_ead_data
+    WHERE legTransactionId LIKE '%.%'  -- Only consider split IDs
+    GROUP BY SUBSTRING_INDEX(legTransactionId, '.', 1)
+)
+UPDATE unfd_positions_dt unfd
+SET 
+    CCR_RWA = COALESCE(
+        COALESCE(saccr_leg.stdAllocatedRwa, saccr_trans.stdAllocatedRwa, saccr_leg_agg.TotalLegRwa), 
+        unfd.CCR_RWA
+    ),
+    RWA_SACCR_FLAG = CASE 
+        WHEN saccr_leg.stdAllocatedRwa IS NOT NULL 
+             OR saccr_trans.stdAllocatedRwa IS NOT NULL 
+             OR saccr_leg_agg.TotalLegRwa IS NOT NULL
+        THEN 'Y' 
+        ELSE 'N' 
+    END
+FROM 
+    unfd_positions_dt unfd
+    LEFT JOIN saccr_rwa_ead_data saccr_leg
+        ON unfd.Transaction_ID_FACS = saccr_leg.legTransactionId
+    LEFT JOIN saccr_rwa_ead_data saccr_trans
+        ON unfd.Transaction_ID_FACS = saccr_trans.transactionId
+    LEFT JOIN Saccr_Leg_Sum saccr_leg_agg
+        ON unfd.Transaction_ID_FACS = saccr_leg_agg.Base_TransactionId;
