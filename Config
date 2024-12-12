@@ -1,12 +1,12 @@
 WITH Saccr_Leg_Sum AS (
     SELECT 
-        SUBSTRING_INDEX(legTransactionId, '.', 1) AS Base_TransactionId,
+        LEFT(legTransactionId, CHARINDEX('.', legTransactionId) - 1) AS Base_TransactionId,
         SUM(stdAllocatedRwa) AS TotalLegRwa
     FROM saccr_rwa_ead_data
-    WHERE legTransactionId LIKE '%.%'  -- Only consider split IDs
-    GROUP BY SUBSTRING_INDEX(legTransactionId, '.', 1)
+    WHERE CHARINDEX('.', legTransactionId) > 0  -- Only consider split IDs
+    GROUP BY LEFT(legTransactionId, CHARINDEX('.', legTransactionId) - 1)
 )
-UPDATE unfd_positions_dt unfd
+UPDATE unfd_positions_dt
 SET 
     CCR_RWA = COALESCE(
         COALESCE(saccr_leg.stdAllocatedRwa, saccr_trans.stdAllocatedRwa, saccr_leg_agg.TotalLegRwa), 
