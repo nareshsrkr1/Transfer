@@ -1,0 +1,51 @@
+import time
+
+# Function to count words in a single file
+def count_words_in_file(file_path):
+    with open(file_path, "r") as file:
+        text = file.read()
+        word_count = len(text.split())
+        print(f"{file_path}: {word_count} words")
+    return word_count
+
+if __name__ == "__main__":
+    # List of sample text files
+    file_paths = ["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt"]
+
+    start_time = time.time()
+
+    total_word_count = 0
+    for file_path in file_paths:
+        total_word_count += count_words_in_file(file_path)
+
+    duration = time.time() - start_time
+    print(f"Total words: {total_word_count}")
+    print(f"Normal processing time: {duration:.2f} seconds")
+
+
+import time
+from multiprocessing import Pool
+
+# Function to count words in a single file
+def count_words_in_file(file_path):
+    with open(file_path, "r") as file:
+        text = file.read()
+        word_count = len(text.split())
+        print(f"{file_path}: {word_count} words")
+    return word_count
+
+if __name__ == "__main__":
+    # List of sample text files
+    file_paths = ["file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt"]
+
+    start_time = time.time()
+
+    # Using multiprocessing to process files in parallel
+    with Pool() as pool:
+        word_counts = pool.map(count_words_in_file, file_paths)
+
+    total_word_count = sum(word_counts)
+    duration = time.time() - start_time
+
+    print(f"Total words: {total_word_count}")
+    print(f"Multiprocessing time: {duration:.2f} seconds")
