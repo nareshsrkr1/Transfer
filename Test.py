@@ -1,37 +1,78 @@
-DECLARE @PageNumber INT = 1;  -- Current page number
-DECLARE @PageSize INT = 50;  -- Number of records per page
+import pyodbc
+from datetime import datetime
 
--- Fetch active columns dynamically from config or define explicitly
-DECLARE @OrderByColumns NVARCHAR(MAX) = 'column1, column2, column3';  -- Replace with actual column names
+def upsert_override_only(data, connection_string):
+    """
+    Update only override columns or insert a new record into override_json_table.
 
-WITH PaginatedResults AS (
-    SELECT 
-        d.*,
-        o.exit_strategy_new AS overridden_exit_strategy,
-        o.business_input_exit_strategy_new AS business_input_for_exit_strategy,
-        o.exit_phase_new AS overridden_exit_phase,
-        o.business_input_exit_phase_new AS business_input_for_exit_phase,
-        o.exit_period_new AS overridden_exit_period,
-        o.business_input_exit_period_new AS business_input_for_exit_period,
-        o.last_updated_by,
-        o.last_updated_on,
-        ROW_NUMBER() OVER (
-            ORDER BY 
-                CASE WHEN @OrderByColumns IS NOT NULL THEN 
-                    HASHBYTES('SHA2_256', CONCAT_WS('|', column1, column2, column3)) -- Active columns as tie-breakers
-                ELSE NULL END
-        ) AS row_num
-    FROM 
-        default_table AS d
-    LEFT JOIN 
-        override_json_table AS o
-    ON 
-        HASHBYTES('SHA2_256', 
-            (SELECT CONCAT_WS('|', column1, column2, column3) 
-             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
-        ) = o.segment_hash_id
-)
-SELECT * 
-FROM PaginatedResults
-WHERE row_num > (@PageNumber - 1) * @PageSize
-  AND row_num <= @PageNumber * @PageSize;
+    Parameters:
+        data (dict): The record containing the hash ID and override details.
+        connection_string (str): The connection string for the SQL Server database.
+    """
+    # Extracting relevant fields from the data
+    segment_hash_id = data.get('segment_hash_id')
+    exit_strategy_override = data.get('exit_strategy_override')
+    exit_phase_override = data.get('exit_phase_override')
+    business_input_override = data.get('business_input_override')
+    last_updated_by = data.get('last_updated_by')
+    last_updated_on = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Establish database connection
+    conn = pyodbc.connect(connection_string)
+    cursor = conn.cursor()
+
+    # Check if the hash ID exists
+    check_query = """
+    SELECT COUNT(1)
+    FROM override_json_table
+    WHERE segment_hash_id = ?
+    """
+    cursor.execute(check_query, (segment_hash_id,))
+    exists = cursor.fetchone()[0] > 0
+
+    if exists:
+        # Update override columns if hash ID exists
+        update_query = """
+        UPDATE override_json_table
+        SET 
+            exit_strategy_override = ?,
+            exit_phase_override = ?,
+            business_input_override = ?,
+            last_updated_by = ?,
+            last_updated_on = ?
+        WHERE segment_hash_id = ?
+        """
+        cursor.execute(update_query, (
+            exit_strategy_override,
+            exit_phase_override,
+            business_input_override,
+            last_updated_by,
+            last_updated_on,
+            segment_hash_id
+        ))
+    else:
+        # Insert a new record with override columns
+        insert_query = """
+        INSERT INTO override_json_table (
+            segment_hash_id,
+            exit_strategy_override,
+            exit_phase_override,
+            business_input_override,
+            last_updated_by,
+            last_updated_on
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+        cursor.execute(insert_query, (
+            segment_hash_id,
+            exit_strategy_override,
+            exit_phase_override,
+            business_input_override,
+            last_updated_by,
+            last_updated_on
+        ))
+
+    # Commit the transaction and close the connection
+    conn.commit()
+    cursor.close()
+    conn.close()
