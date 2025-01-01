@@ -1,6 +1,5 @@
 -- Step 1: Declare necessary variables
 DECLARE @HashIdJson NVARCHAR(MAX);
-DECLARE @HashId VARBINARY(64);
 DECLARE @DynamicQuery NVARCHAR(MAX);
 DECLARE @FinalColumns TABLE (
     ColumnName NVARCHAR(128),
@@ -25,30 +24,21 @@ VALUES
     ('Exit_Strategy', 'Exit_Strategy', 12),
     ('Exit_Phase', 'Exit_Phase', 13);
 
--- Step 2: Construct JSON dynamically using the ColumnName and AliasName
-SET @DynamicQuery = 
-    'SELECT @HashIdJson = ''{'' + STRING_AGG(' +
-    ' ''"'' + fc.AliasName + ''":"' +
-    ' ISNULL(CAST(u.[' + fc.ColumnName + '] AS NVARCHAR(MAX)), '''') + ''"'',' +
-    ' '') + ''}'' ' +
+-- Step 2: Construct dynamic SQL to build the JSON
+SET @DynamicQuery = '
+    SELECT @HashIdJson = ''{'' + STRING_AGG(
+        ''"'' + fc.AliasName + ''":"'' +
+        ' + 'ISNULL(CAST(u.' + QUOTENAME(fc.ColumnName) + ' AS NVARCHAR(MAX)), '''') + ''''',' +
+        ''''') + ''}'' ' +
     'FROM @FinalColumns fc ' +
-    'JOIN UNFD u ON fc.ColumnName = u.ColumnName ' + -- Ensure we match column names correctly
-    'ORDER BY fc.SortOrder';
+    'JOIN UNFD u ON fc.ColumnName = u.ColumnName ' + -- Make sure column names match
+    'ORDER BY fc.SortOrder'; -- Ensures the columns are ordered based on the SortOrder
 
 -- Debug: Print dynamic query for review
 PRINT @DynamicQuery;
 
--- Step 3: Execute the dynamic query
+-- Step 3: Execute the dynamic query to construct the JSON string
 EXEC sp_executesql @DynamicQuery, N'@HashIdJson NVARCHAR(MAX) OUTPUT', @HashIdJson OUTPUT;
 
 -- Step 4: Debug the constructed JSON
 PRINT 'Constructed JSON: ' + @HashIdJson;
-
--- Step 5: Generate HashID using the constructed JSON
-SET @HashId = HASHBYTES('SHA2_256', @HashIdJson);
-
--- Convert to readable hexadecimal format
-SELECT LOWER(CONVERT(VARCHAR(64), @HashId, 2)) AS HashId;
-
--- Debug: Output the HashId
-PRINT 'Generated HashId: ' + LOWER(CONVERT(VARCHAR(64), @HashId, 2));
