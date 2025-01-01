@@ -1,35 +1,35 @@
 -- Step 1: Declare necessary variables
-DECLARE @JsonString NVARCHAR(MAX);
 DECLARE @DynamicSQL NVARCHAR(MAX);
-DECLARE @HashId VARBINARY(64);
+DECLARE @JsonColumns NVARCHAR(MAX);
+DECLARE @HashIdSql NVARCHAR(MAX);
 
--- Step 2: Initialize the JSON string
-SET @JsonString = '{';
+-- Step 2: Initialize variables
+SET @DynamicSQL = 'SELECT ';
+SET @JsonColumns = '';
+SET @HashIdSql = '';
 
--- Step 3: Build the dynamic SQL query to generate the JSON string
-SET @DynamicSQL = '';
-
--- Dynamically construct the JSON string based on AliasName and the corresponding values from UNFD
-SELECT @DynamicSQL = @DynamicSQL + 
-    ', "' + LOWER(fc.AliasName) + '": ISNULL(CAST(u.' + fc.UfdColumnName + ' AS NVARCHAR(MAX)), '''')'
+-- Step 3: Construct the dynamic SQL for columns and JSON generation
+SELECT 
+    @JsonColumns = @JsonColumns + 
+        CASE 
+            WHEN fc.AliasName = 'Exit Period' THEN 'exit_period AS business_input, '
+            ELSE fc.UfdColumnName + ', '
+        END
 FROM @FinalColumns fc
-JOIN unfd_positions_dt u ON fc.UfdColumnName = u.ColumnName  -- This will join the correct column name
-ORDER BY fc.SortOrder;  -- Ensure the columns are in the correct order
+ORDER BY fc.SortOrder;
 
--- Remove the leading comma from @DynamicSQL
-SET @JsonString = @JsonString + RIGHT(@DynamicSQL, LEN(@DynamicSQL) - 1);
+-- Remove the last comma
+SET @JsonColumns = LEFT(@JsonColumns, LEN(@JsonColumns) - 2);
 
--- Close the JSON string with the closing brace
-SET @JsonString = @JsonString + '}';
+-- Step 4: Construct the full dynamic SQL for JSON and Hash ID
+SET @DynamicSQL = @DynamicSQL + 
+    '(SELECT ' + @JsonColumns + ' FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS segment_json, ' +
+    'LOWER(CONVERT(VARCHAR(64), HASHBYTES(''SHA2_256'', ' +
+    '(SELECT ' + @JsonColumns + ' FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)), 2)) AS segment_hash_id ' +
+    'FROM UNFD_POSITIONS_DT';
 
--- Debug: Output the constructed JSON
-PRINT 'Constructed JSON: ' + @JsonString;
+-- Step 5: Print the dynamic SQL for debugging purposes
+PRINT @DynamicSQL;
 
--- Step 4: Generate HashID using the constructed JSON
-SET @HashId = HASHBYTES('SHA2_256', @JsonString);
-
--- Convert to readable hexadecimal format
-SELECT LOWER(CONVERT(VARCHAR(64), @HashId, 2)) AS HashId;
-
--- Debug: Output the HashId
-PRINT 'Generated HashId: ' + LOWER(CONVERT(VARCHAR(64), @HashId, 2));
+-- Step 6: Execute the dynamic SQL
+EXEC sp_executesql @DynamicSQL;
