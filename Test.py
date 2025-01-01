@@ -5,8 +5,6 @@ DECLARE @HashIdJson NVARCHAR(MAX);
 SET @HashIdJson = '{';
 
 -- Construct the JSON string manually, adding each field dynamically based on @FinalColumns
--- Note: Make sure to adapt this to match the number of records in your FinalColumns table
-
 SELECT @HashIdJson = @HashIdJson + 
     '"' + fc.AliasName + '":' + 
     'ISNULL(CAST(u.' + fc.ColumnName + ' AS NVARCHAR(MAX)), '''')' + 
