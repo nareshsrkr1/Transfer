@@ -1,35 +1,48 @@
--- Step 1: Declare necessary variables
-DECLARE @DynamicSQL NVARCHAR(MAX);
-DECLARE @JsonColumns NVARCHAR(MAX);
-DECLARE @HashIdSql NVARCHAR(MAX);
-
--- Step 2: Initialize variables
-SET @DynamicSQL = 'SELECT ';
-SET @JsonColumns = '';
-SET @HashIdSql = '';
-
--- Step 3: Construct the dynamic SQL for columns and JSON generation
+-- Step 1: Expand Segments with Customer_Legal_Entity_Name
+INSERT INTO wpd (hashid, segment_json, exit_strnew, exit_phase_new, business_input_new, business_exit_strategy)
 SELECT 
-    @JsonColumns = @JsonColumns + 
-        CASE 
-            WHEN fc.AliasName = 'Exit Period' THEN 'exit_period AS business_input, '
-            ELSE fc.UfdColumnName + ', '
-        END
-FROM @FinalColumns fc
-ORDER BY fc.SortOrder;
-
--- Remove the last comma
-SET @JsonColumns = LEFT(@JsonColumns, LEN(@JsonColumns) - 2);
-
--- Step 4: Construct the full dynamic SQL for JSON and Hash ID
-SET @DynamicSQL = @DynamicSQL + 
-    '(SELECT ' + @JsonColumns + ' FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS segment_json, ' +
-    'LOWER(CONVERT(VARCHAR(64), HASHBYTES(''SHA2_256'', ' +
-    '(SELECT ' + @JsonColumns + ' FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)), 2)) AS segment_hash_id ' +
-    'FROM UNFD_POSITIONS_DT';
-
--- Step 5: Print the dynamic SQL for debugging purposes
-PRINT @DynamicSQL;
-
--- Step 6: Execute the dynamic SQL
-EXEC sp_executesql @DynamicSQL;
+    LOWER(CONVERT(VARCHAR(64), 
+        HASHBYTES('SHA2_256', 
+            (
+                SELECT 
+                    dt.Business_Name,
+                    dt.Records_Entity_Name,
+                    dt.DnTProduct_Type,
+                    dt.DerivativeOrCash,
+                    dt.Maturity_Bucket,
+                    dt.Local_Currency,
+                    dt.Transaction_Type,
+                    dt.Collateralization,
+                    dt.CounterParty_Type,
+                    dt.Product_Liquidity,
+                    dt.Banking_TradingFlag,
+                    dt.Exit_Strategy_Default,
+                    dt.Exit_Phase_Default,
+                    dt.Business_Input_Default,
+                    u.Customer_Legal_Entity_Name
+                FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+            )
+        )
+    ), 2) AS hashid, -- New hashid for granular segment
+    JSON_MODIFY(
+        JSON_MODIFY(
+            dt.segment_json, 
+            '$.Customer_Legal_Entity_Name', 
+            u.Customer_Legal_Entity_Name
+        ), 
+        '$.Business', 
+        dt.Business_Name
+    ) AS segment_json, -- Updated JSON with Customer_Legal_Entity_Name
+    o.exit_strnew, -- Carry forward existing override for Exit_Strategy_New
+    o.exit_phase_new, -- Carry forward existing override for Exit_Phase_New
+    o.business_input_new, -- Carry forward existing override for Business_Input_New
+    NULL AS business_exit_strategy -- Reset business override for user updates
+FROM 
+    windDownParams_Unfd_Default AS dt
+JOIN 
+    windDownParams_Override_JSON AS o
+    ON dt.hashid = o.hashid -- Match existing segments
+JOIN 
+    unfd AS u
+    ON dt.Business_Name = u.Business_Name 
+       AND dt.Records_Entity_Name = u.Records_Entity_Name;
