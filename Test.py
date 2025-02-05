@@ -1,55 +1,55 @@
-[service1]
-name = My Flask Service 1
-pid_file = /tmp/service1.pid
-start_command = nohup python3 /path/to/service1.py & echo $! > /tmp/service1.pid
+[main_service]
+name = Main Service
+process_name = main_service.py
+start_command = nohup python3 /path/to/main_service.py &
 
-[service2]
-name = My Flask Service 2
-pid_file = /tmp/service2.pid
-start_command = nohup python3 /path/to/service2.py & echo $! > /tmp/service2.pid
+[splitter_service]
+name = Splitter Service
+process_name = splitter_service.py
+start_command = nohup python3 /path/to/splitter_service.py &
 
-[service3]
-name = My Flask Service 3
-pid_file = /tmp/service3.pid
-start_command = nohup python3 /path/to/service3.py & echo $! > /tmp/service3.pid
+[rlen_service]
+name = Rlen Service
+process_name = rlen_service.py
+start_command = nohup python3 /path/to/rlen_service.py &
 
-[service4]
-name = My Flask Service 4
-pid_file = /tmp/service4.pid
-start_command = nohup python3 /path/to/service4.py & echo $! > /tmp/service4.pid
+[wind_down_service]
+name = WindDown Service
+process_name = wind_down_service.py
+start_command = nohup python3 /path/to/wind_down_service.py &
 
-Here’s a solution that allows you to control your Flask services via a configuration file (python_service_monitor_config.ini). The script will check for each service’s process ID (PID), and if it is not running, it will restart the service using the command specified in the config file.
+Here’s the revised solution that does not use PID files. Instead, it checks for the process directly by matching the service name in the system processes. If the service is not running, it logs the failure and restarts it using the start command from the config file.
 
 
 ---
 
 Step 1: Create the Configuration File
 
-Create a file named python_service_monitor_config.ini with the following structure:
+Create a file named service_monitor_config.ini with the following structure:
 
-[service1]
-name = My Flask Service 1
-pid_file = /tmp/service1.pid
-start_command = nohup python3 /path/to/service1.py & echo $! > /tmp/service1.pid
+[main_service]
+name = Main Service
+process_name = main_service.py
+start_command = nohup python3 /path/to/main_service.py &
 
-[service2]
-name = My Flask Service 2
-pid_file = /tmp/service2.pid
-start_command = nohup python3 /path/to/service2.py & echo $! > /tmp/service2.pid
+[splitter_service]
+name = Splitter Service
+process_name = splitter_service.py
+start_command = nohup python3 /path/to/splitter_service.py &
 
-[service3]
-name = My Flask Service 3
-pid_file = /tmp/service3.pid
-start_command = nohup python3 /path/to/service3.py & echo $! > /tmp/service3.pid
+[rlen_service]
+name = Rlen Service
+process_name = rlen_service.py
+start_command = nohup python3 /path/to/rlen_service.py &
 
-[service4]
-name = My Flask Service 4
-pid_file = /tmp/service4.pid
-start_command = nohup python3 /path/to/service4.py & echo $! > /tmp/service4.pid
+[wind_down_service]
+name = WindDown Service
+process_name = wind_down_service.py
+start_command = nohup python3 /path/to/wind_down_service.py &
 
-pid_file: Stores the process ID for each service.
+process_name: Name of the running Python script to check.
 
-start_command: Command to restart the service.
+start_command: Command to restart the service if not running.
 
 
 
@@ -57,16 +57,19 @@ start_command: Command to restart the service.
 
 Step 2: Create the Monitoring Script
 
-Create a Python script to check the PIDs and restart services if necessary.
-
 service_monitor.py
 
 import os
 import time
+import logging
 import configparser
 import psutil
 
-CONFIG_FILE = "python_service_monitor_config.ini"
+# Configure logging
+logging.basicConfig(filename="service_monitor.log", level=logging.INFO, 
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+
+CONFIG_FILE = "service_monitor_config.ini"
 
 def read_config():
     """Read the service configuration file."""
@@ -74,19 +77,21 @@ def read_config():
     config.read(CONFIG_FILE)
     return config
 
-def is_process_running(pid):
-    """Check if a process is running given a PID."""
-    try:
-        return psutil.pid_exists(int(pid))
-    except (ValueError, psutil.NoSuchProcess):
-        return False
+def is_service_running(process_name):
+    """Check if a process with the given name is running."""
+    for proc in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            if proc.info['cmdline'] and process_name in ' '.join(proc.info['cmdline']):
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return False
 
-def restart_service(service_name, pid_file, start_command):
-    """Restart the service and update the PID file."""
-    print(f"Restarting {service_name}...")
-
-    # Start the service and update the PID file
+def restart_service(service_name, process_name, start_command):
+    """Restart the service and log the action."""
+    logging.warning(f"{service_name} ({process_name}) is not running. Restarting...")
     os.system(start_command)
+    logging.info(f"{service_name} restarted successfully.")
 
 def monitor_services():
     """Monitor all services and restart if necessary."""
@@ -94,24 +99,18 @@ def monitor_services():
 
     while True:
         for service in config.sections():
-            pid_file = config[service].get("pid_file")
-            start_command = config[service].get("start_command")
             service_name = config[service].get("name", service)
+            process_name = config[service].get("process_name")
+            start_command = config[service].get("start_command")
 
-            # Check if PID file exists and get the PID
-            if os.path.exists(pid_file):
-                with open(pid_file, "r") as f:
-                    pid = f.read().strip()
-            else:
-                pid = None
-
-            # Restart service if not running
-            if not pid or not is_process_running(pid):
-                restart_service(service_name, pid_file, start_command)
+            # Check if service is running
+            if not is_service_running(process_name):
+                restart_service(service_name, process_name, start_command)
 
         time.sleep(30)  # Check every 30 seconds
 
 if __name__ == "__main__":
+    logging.info("Starting Service Monitor...")
     monitor_services()
 
 
@@ -119,7 +118,7 @@ if __name__ == "__main__":
 
 Step 3: Running the Monitoring Script
 
-Run the monitoring script in the background:
+Run the script in the background:
 
 nohup python3 service_monitor.py &
 
@@ -130,27 +129,34 @@ This will continuously check if the services are running and restart them if nee
 
 How It Works
 
-1. The script reads the python_service_monitor_config.ini file.
+1. Reads service_monitor_config.ini to get the process names and start commands.
 
 
-2. It checks if the PID in the pid_file exists.
+2. Checks if the process is running using psutil.process_iter().
 
 
-3. If the process is not running, it restarts the service using start_command.
+3. Logs and restarts the service if it’s not running.
 
 
-4. The start_command writes a new PID to pid_file after restarting.
+4. Runs in a loop every 30 seconds to monitor and restart services if needed.
 
 
+
+Logging Example (service_monitor.log)
+
+2025-02-05 10:00:00 - INFO - Starting Service Monitor...
+2025-02-05 10:05:30 - WARNING - Main Service (main_service.py) is not running. Restarting...
+2025-02-05 10:05:31 - INFO - Main Service restarted successfully.
 
 
 ---
 
 Advantages of This Approach
 
-✅ Configurable – Easily add/remove services via the config file.
-✅ PID-based Monitoring – Ensures proper tracking of process status.
-✅ Automated Restarts – Restarts only if a service is down.
+✅ No PID files – Directly monitors process names.
+✅ Configurable – Easily add/remove services via service_monitor_config.ini.
+✅ Automated Logging – Logs failures and restarts for debugging.
+✅ Lightweight – Uses psutil for efficient process monitoring.
 
 Would you like any modifications to this setup?
 
