@@ -1,61 +1,41 @@
-[main_service]
-name = Main Service
-process_name = main_service.py
-start_command = nohup python3 /path/to/main_service.py &
-
-[splitter_service]
-name = Splitter Service
-process_name = splitter_service.py
-start_command = nohup python3 /path/to/splitter_service.py &
-
-[rlen_service]
-name = Rlen Service
-process_name = rlen_service.py
-start_command = nohup python3 /path/to/rlen_service.py &
-
-[wind_down_service]
-name = WindDown Service
-process_name = wind_down_service.py
-start_command = nohup python3 /path/to/wind_down_service.py &
-
-Here’s the revised solution that does not use PID files. Instead, it checks for the process directly by matching the service name in the system processes. If the service is not running, it logs the failure and restarts it using the start command from the config file.
+Yes, you can use the full absolute path (e.g., /abc/prod/main.py) in the config file, but psutil does not always return the full path in cmdline. To ensure a reliable match, I'll update the script to check the exact match for the full path.
 
 
 ---
 
-Step 1: Create the Configuration File
+Step 1: Update Configuration File
 
-Create a file named service_monitor_config.ini with the following structure:
+Modify your service_monitor_config.ini with full script paths:
 
 [main_service]
 name = Main Service
-process_name = main_service.py
-start_command = nohup python3 /path/to/main_service.py &
+process_path = /abc/prod/main.py
+start_command = nohup python3 /abc/prod/main.py &
 
 [splitter_service]
 name = Splitter Service
-process_name = splitter_service.py
-start_command = nohup python3 /path/to/splitter_service.py &
+process_path = /abc/prod/splitter.py
+start_command = nohup python3 /abc/prod/splitter.py &
 
 [rlen_service]
 name = Rlen Service
-process_name = rlen_service.py
-start_command = nohup python3 /path/to/rlen_service.py &
+process_path = /abc/prod/rlen.py
+start_command = nohup python3 /abc/prod/rlen.py &
 
 [wind_down_service]
 name = WindDown Service
-process_name = wind_down_service.py
-start_command = nohup python3 /path/to/wind_down_service.py &
+process_path = /abc/prod/wind_down.py
+start_command = nohup python3 /abc/prod/wind_down.py &
 
-process_name: Name of the running Python script to check.
-
-start_command: Command to restart the service if not running.
+Renamed process_name → process_path to specify the full path.
 
 
 
 ---
 
-Step 2: Create the Monitoring Script
+Step 2: Update Monitoring Script
+
+Modify service_monitor.py to check the exact full path of the process.
 
 service_monitor.py
 
@@ -77,19 +57,20 @@ def read_config():
     config.read(CONFIG_FILE)
     return config
 
-def is_service_running(process_name):
-    """Check if a process with the given name is running."""
+def is_service_running(process_path):
+    """Check if a process with the given full script path is running."""
     for proc in psutil.process_iter(['pid', 'cmdline']):
         try:
-            if proc.info['cmdline'] and process_name in ' '.join(proc.info['cmdline']):
-                return True
+            cmdline = proc.info['cmdline']
+            if cmdline and process_path in cmdline:
+                return True  # Exact match found
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
     return False
 
-def restart_service(service_name, process_name, start_command):
+def restart_service(service_name, process_path, start_command):
     """Restart the service and log the action."""
-    logging.warning(f"{service_name} ({process_name}) is not running. Restarting...")
+    logging.warning(f"{service_name} ({process_path}) is not running. Restarting...")
     os.system(start_command)
     logging.info(f"{service_name} restarted successfully.")
 
@@ -100,12 +81,12 @@ def monitor_services():
     while True:
         for service in config.sections():
             service_name = config[service].get("name", service)
-            process_name = config[service].get("process_name")
+            process_path = config[service].get("process_path")
             start_command = config[service].get("start_command")
 
             # Check if service is running
-            if not is_service_running(process_name):
-                restart_service(service_name, process_name, start_command)
+            if not is_service_running(process_path):
+                restart_service(service_name, process_path, start_command)
 
         time.sleep(30)  # Check every 30 seconds
 
@@ -116,47 +97,38 @@ if __name__ == "__main__":
 
 ---
 
+Key Changes in Code
+
+✅ Now matches the exact full path (/abc/prod/main.py) instead of just main.py.
+✅ Ensures only your intended script is monitored, even if other main.py processes exist.
+✅ More reliable process matching compared to searching only for a filename.
+
+
+---
+
 Step 3: Running the Monitoring Script
 
 Run the script in the background:
 
 nohup python3 service_monitor.py &
 
-This will continuously check if the services are running and restart them if needed.
-
 
 ---
 
-How It Works
-
-1. Reads service_monitor_config.ini to get the process names and start commands.
-
-
-2. Checks if the process is running using psutil.process_iter().
-
-
-3. Logs and restarts the service if it’s not running.
-
-
-4. Runs in a loop every 30 seconds to monitor and restart services if needed.
-
-
-
-Logging Example (service_monitor.log)
+Example Log Output (service_monitor.log)
 
 2025-02-05 10:00:00 - INFO - Starting Service Monitor...
-2025-02-05 10:05:30 - WARNING - Main Service (main_service.py) is not running. Restarting...
+2025-02-05 10:05:30 - WARNING - Main Service (/abc/prod/main.py) is not running. Restarting...
 2025-02-05 10:05:31 - INFO - Main Service restarted successfully.
 
 
 ---
 
-Advantages of This Approach
+Final Thoughts
 
-✅ No PID files – Directly monitors process names.
-✅ Configurable – Easily add/remove services via service_monitor_config.ini.
-✅ Automated Logging – Logs failures and restarts for debugging.
-✅ Lightweight – Uses psutil for efficient process monitoring.
+✅ Now supports full script paths (/abc/prod/main.py).
+✅ No risk of confusion with other main.py processes.
+✅ Reliable monitoring & automatic restarts.
 
-Would you like any modifications to this setup?
+Would you like any additional modifications?
 
