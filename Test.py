@@ -29,3 +29,30 @@
     <button class="btn btn-warning ml-2">Reset</button>
   </div>
 </div>
+
+
+.container {
+  width: 90%;
+  margin: auto;
+}
+
+.segment-row, .override-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+app-select-dropdown {
+  width: 200px;
+  margin-right: 10px;
+}
+
+.search-box {
+  flex-grow: 1;
+  max-width: 250px;
+  margin-right: 10px;
+}
+
+button {
+  height: 30px;
+}
