@@ -1,122 +1,82 @@
 updateFieldVisibilityAndAccessibility: function (executionContext) {
-           debugger;
-            try {
-                var formContext = executionContext.getFormContext();
-                var  eventArgs = executionContext.getEventArgs();
-                
-                var statusPAA2 = formContext.getAttribute("statuscode").getValue();
-                var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
+    try {
+        var formContext = executionContext.getFormContext();
+        var eventArgs = executionContext.getEventArgs();
+        var isSaveEvent = eventArgs && typeof eventArgs.getSaveMode === "function";
 
-                if (statusPAA2 == 100000004 && hmDecision == null) {
-                    var careHomeLookup = formContext.getAttribute("bupa_bupacarehome").getValue();
+        var statusPAA2 = formContext.getAttribute("statuscode").getValue();
+        var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
 
-                    if (careHomeLookup && careHomeLookup.length > 0) {
-                        var careHomeID = careHomeLookup[0].id.replace("{", "").replace("}", "");
-                        if (careHomeID != null) {
-                            Xrm.WebApi.retrieveRecord("bupa_bupacarehome", careHomeID, "?$select=bupa_homecategory")
-                                .then(function success(result) {
-                                    var category = result.bupa_homecategory;
-                                    if (category != null) {
-                                        if (category == 100000000) {
-                                            formContext.getControl("bupa_carehomeunit").setVisible(true);
-                                            formContext.getAttribute("bupa_carehomeunit").setRequiredLevel("none");
-                                            formContext.getControl("bupa_roomnumber").setVisible(true);
-                                            formContext.getAttribute("bupa_roomnumber").setRequiredLevel("none");
-                                            formContext.getControl("bupa_typeoffunding").setVisible(true);
-                                            formContext.getAttribute("bupa_typeoffunding").setRequiredLevel("none");
-                                            formContext.getControl("bupa_agreedfee").setVisible(true);
-                                            formContext.getAttribute("bupa_agreedfee").setRequiredLevel("none");
-                                            formContext.getControl("bupa_residentcontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_residentcontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_fundednursingcarefnc").setVisible(true);
-                                            formContext.getAttribute("bupa_fundednursingcarefnc").setRequiredLevel("none");
-                                            formContext.getControl("bupa_thirdpartycontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_thirdpartycontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_localauthoritycontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_localauthoritycontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_continuinghealthcare").setVisible(true);
-                                            formContext.getAttribute("bupa_continuinghealthcare").setRequiredLevel("none");
-                                            formContext.getControl("bupa_initialmonthfee").setVisible(true);
-                                            formContext.getAttribute("bupa_initialmonthfee").setRequiredLevel("none");
-                                            formContext.getControl("bupa_admissionanalysis").setVisible(true);
-                                            formContext.getAttribute("bupa_admissionanalysis").setRequiredLevel("none");
-                                            formContext.getControl("bupa_caretype").setVisible(true);
-                                            formContext.getAttribute("bupa_caretype").setRequiredLevel("none");
-                                            formContext.getControl("bupa_proposedadmissiondate").setVisible(true);
-                                            formContext.getAttribute("bupa_proposedadmissiondate").setRequiredLevel("none");
-                                            formContext.getControl("bupa_whoissigningthecontract").setVisible(true);
-                                            formContext.getAttribute("bupa_whoissigningthecontract").setRequiredLevel("none");
-                                            formContext.getControl("bupa_willthefeebepaidbydirectdebit").setVisible(true);
-                                            formContext.getAttribute("bupa_willthefeebepaidbydirectdebit").setRequiredLevel("none");
-                                             formContext.getControl("bupa_whoissigningdd").setVisible(true);
-                                            formContext.getAttribute("bupa_whoissigningdd").setRequiredLevel("none");
-                                          
-                                          
-                                        }
-                                        else if (category == 100000001) {
-                                            formContext.getControl("bupa_typeoffunding").setVisible(true);
-                                            formContext.getAttribute("bupa_typeoffunding").setRequiredLevel("none");
-                                            formContext.getControl("bupa_agreedfee").setVisible(true);
-                                            formContext.getAttribute("bupa_agreedfee").setRequiredLevel("none");
-                                            formContext.getControl("bupa_residentcontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_residentcontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_fundednursingcarefnc").setVisible(true);
-                                            formContext.getAttribute("bupa_fundednursingcarefnc").setRequiredLevel("none");
-                                            formContext.getControl("bupa_thirdpartycontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_thirdpartycontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_localauthoritycontribution").setVisible(true);
-                                            formContext.getAttribute("bupa_localauthoritycontribution").setRequiredLevel("none");
-                                            formContext.getControl("bupa_continuinghealthcare").setVisible(true);
-                                            formContext.getAttribute("bupa_continuinghealthcare").setRequiredLevel("none");
-                                            formContext.getControl("bupa_initialmonthfee").setVisible(true);
-                                            formContext.getAttribute("bupa_initialmonthfee").setRequiredLevel("none");
-                                            formContext.getControl("bupa_admissionanalysis").setVisible(true);
-                                            formContext.getAttribute("bupa_admissionanalysis").setRequiredLevel("none");
-                                            formContext.getControl("bupa_caretype").setVisible(true);
-                                            formContext.getAttribute("bupa_caretype").setRequiredLevel("none");
-                                            formContext.getControl("bupa_proposedadmissiondate").setVisible(true);
-                                            formContext.getAttribute("bupa_proposedadmissiondate").setRequiredLevel("none");
-                                            formContext.getControl("bupa_whoissigningthecontract").setVisible(true);
-                                            formContext.getAttribute("bupa_whoissigningthecontract").setRequiredLevel("none");
-                                            formContext.getControl("bupa_willthefeebepaidbydirectdebit").setVisible(true);
-                                            formContext.getAttribute("bupa_willthefeebepaidbydirectdebit").setRequiredLevel("none");
-                                              formContext.getControl("bupa_whoissigningdd").setVisible(true);
-                                            formContext.getAttribute("bupa_whoissigningdd").setRequiredLevel("none");
-                                        }
-                                    }
-                                    else
-                                        console.error("Could not fetch home category: " + error.message);
-                                })
-                                .catch(function error(error) {
-                                    console.error("Home Category is not filled for this care home: " + error.message);
-                                });
-                        }
-                        var confirmStrings = {
-                            title: "Unsaved Changes",
-                            text: "Do you want to save changes before refreshing?"
-                        };
-                    
-                        var confirmOptions = {
-                            height: 200,
-                            width: 450
-                        };
-                        Xrm.Navigation.confirmDialog(
-                            confirmStrings,confirmOptions
-                        ).then(function (success) {
-                            if (success.confirmed) {
-                                // User clicked "Save"
-                                formContext.data.save().then(function () {
-                                    formContext.data.refresh(false); // Refresh after save
-                                });
-                            } else {
-                                // User clicked "Discard"
-                                formContext.data.refresh(true); // Force refresh and discard changes
+        if (statusPAA2 == 100000004 && hmDecision == null) {
+            var careHomeLookup = formContext.getAttribute("bupa_bupacarehome").getValue();
+
+            if (careHomeLookup && careHomeLookup.length > 0) {
+                var careHomeID = careHomeLookup[0].id.replace("{", "").replace("}", "");
+                if (careHomeID != null) {
+                    Xrm.WebApi.retrieveRecord("bupa_bupacarehome", careHomeID, "?$select=bupa_homecategory")
+                        .then(function success(result) {
+                            var category = result.bupa_homecategory;
+                            if (category != null) {
+                                if (category == 100000000) {
+                                    var controlsToShow = [
+                                        "bupa_carehomeunit", "bupa_roomnumber", "bupa_typeoffunding", "bupa_agreedfee",
+                                        "bupa_residentcontribution", "bupa_fundednursingcarefnc", "bupa_thirdpartycontribution",
+                                        "bupa_localauthoritycontribution", "bupa_continuinghealthcare", "bupa_initialmonthfee",
+                                        "bupa_admissionanalysis", "bupa_caretype", "bupa_proposedadmissiondate",
+                                        "bupa_whoissigningthecontract", "bupa_willthefeebepaidbydirectdebit", "bupa_whoissigningdd"
+                                    ];
+                                    controlsToShow.forEach(function (fieldName) {
+                                        formContext.getControl(fieldName).setVisible(true);
+                                        formContext.getAttribute(fieldName).setRequiredLevel("none");
+                                    });
+                                } else if (category == 100000001) {
+                                    var controlsToShow = [
+                                        "bupa_typeoffunding", "bupa_agreedfee", "bupa_residentcontribution",
+                                        "bupa_fundednursingcarefnc", "bupa_thirdpartycontribution", "bupa_localauthoritycontribution",
+                                        "bupa_continuinghealthcare", "bupa_initialmonthfee", "bupa_admissionanalysis",
+                                        "bupa_caretype", "bupa_proposedadmissiondate", "bupa_whoissigningthecontract",
+                                        "bupa_willthefeebepaidbydirectdebit", "bupa_whoissigningdd"
+                                    ];
+                                    controlsToShow.forEach(function (fieldName) {
+                                        formContext.getControl(fieldName).setVisible(true);
+                                        formContext.getAttribute(fieldName).setRequiredLevel("none");
+                                    });
+                                }
                             }
-                        });
 
-     }
+                            // Show confirm dialog only on save
+                            if (isSaveEvent) {
+                                var confirmStrings = {
+                                    title: "Unsaved Changes",
+                                    text: "Do you want to save changes before refreshing?"
+                                };
+
+                                var confirmOptions = {
+                                    height: 200,
+                                    width: 450
+                                };
+
+                                Xrm.Navigation.confirmDialog(confirmStrings, confirmOptions)
+                                    .then(function (success) {
+                                        if (success.confirmed) {
+                                            formContext.data.save().then(function () {
+                                                formContext.data.refresh(false); // Refresh after save
+                                            });
+                                        } else {
+                                            formContext.data.refresh(true); // Discard and refresh
+                                        }
+                                    });
+                            }
+
+                        })
+                        .catch(function (error) {
+                            console.error("Home Category fetch error: " + error.message);
+                        });
                 }
-            } catch (err) {
-                console.log("Error" + err.message);
             }
         }
+
+    } catch (err) {
+        console.log("Error: " + err.message);
+    }
+}
