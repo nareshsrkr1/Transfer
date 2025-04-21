@@ -4,12 +4,9 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                 var formContext = executionContext.getFormContext();
                 var  eventArgs = executionContext.getEventArgs();
                 var isSaveEvent = eventArgs && typeof eventArgs.getSaveMode === "function";
- if (!isSaveEvent) {
-            return;
-        }
+ 
 
-        // Prevent the default save behavior so that we can manually handle it later
-        eventArgs.preventDefault();
+       
                 var statusPAA2 = formContext.getAttribute("statuscode").getValue();
                 var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
 
@@ -93,14 +90,9 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                                     else
                                         console.error("Could not fetch home category: " + error.message);
 
-                                })
-                                .catch(function error(error) {
-                                    console.error("Home Category is not filled for this care home: " + error.message);
-                                });
-                        }
- 
-
 if (isSaveEvent && formContext.data.entity.getIsDirty()) {
+ // Prevent the default save behavior so that we can manually handle it later
+        eventArgs.preventDefault();
                                 var confirmStrings = {
                                     title: "Unsaved Changes",
                                     text: "Do you want to save changes before refreshing?"
@@ -119,6 +111,15 @@ if (isSaveEvent && formContext.data.entity.getIsDirty()) {
                                     }
                                 });
                             }
+
+                                })
+                                .catch(function error(error) {
+                                    console.error("Home Category is not filled for this care home: " + error.message);
+                                });
+                        }
+ 
+
+
      }
                 }
             } catch (err) {
