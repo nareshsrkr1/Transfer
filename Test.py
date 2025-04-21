@@ -1,21 +1,15 @@
 Test.py
 
-function refreshOnlyOnSave(executionContext) {
-    var formContext = executionContext.getFormContext();
-    var eventArgs = executionContext.getEventArgs();
-
-    // Check if the current event is a save event
-    if (eventArgs && typeof eventArgs.getSaveMode === "function") {
+if (eventArgs && typeof eventArgs.getSaveMode === "function") {
         var saveMode = eventArgs.getSaveMode();
 
         // Trigger refresh only after actual save (Save, Save & Close, Save & New)
         if (saveMode === 1 || saveMode === 59 || saveMode === 70) {
             setTimeout(function () {
-                formContext.data.refresh(false); // Refresh after save, no popup
-            }, 1000); // Optional delay to ensure save completes
+                formContext.data.refresh(true); // Refresh after save, no popup
+            }, 100); // Optional delay to ensure save completes
         }
     }
-}
 
 
 
