@@ -1,6 +1,32 @@
 Test.py
 
 
+function refreshOnlyAfterSave(executionContext) {
+    var formContext = executionContext.getFormContext();
+    var eventArgs = executionContext.getEventArgs();
+
+    // On Save: set flag
+    if (eventArgs && typeof eventArgs.getSaveMode === "function") {
+        var saveMode = eventArgs.getSaveMode();
+
+        if (saveMode === 1 || saveMode === 59 || saveMode === 70) {
+            sessionStorage.setItem("refreshAfterSave", "true");
+        }
+        return;
+    }
+
+    // On Load: check flag and refresh
+    if (sessionStorage.getItem("refreshAfterSave") === "true") {
+        sessionStorage.removeItem("refreshAfterSave");
+
+        setTimeout(function () {
+            formContext.data.refresh(false); // refresh silently
+        }, 1000);
+    }
+}
+
+
+
 
 // Define a global flag (outside the function)
 var shouldRefreshAfterSave = false;
