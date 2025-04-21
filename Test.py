@@ -100,7 +100,7 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
  
 if (isSaveEvent && formContext.data.entity.getIsDirty()) {
  // Prevent the default save behavior so that we can manually handle it later
-        //eventArgs.preventDefault();
+        eventArgs.preventDefault();
                                 var confirmStrings = {
                                     title: "Unsaved Changes",
                                     text: "Do you want to save changes before refreshing?"
@@ -115,7 +115,7 @@ if (isSaveEvent && formContext.data.entity.getIsDirty()) {
                                             formContext.data.refresh(true);
                                         });
                                     } else {
-                                        formContext.data.refresh(true);
+                                      SDK.Bupa.Sales.RDT.PAA2.Form.updateFieldVisibilityAndAccessibility(executionContext);
                                     }
                                 });
                             }
