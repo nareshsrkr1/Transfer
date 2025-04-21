@@ -1,4 +1,4 @@
-updateFieldVisibilityAndAccessibility: function (executionContext) {
+ updateFieldVisibilityAndAccessibility: function (executionContext) {
            debugger;
             try {
                 var formContext = executionContext.getFormContext();
@@ -98,27 +98,17 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                                 });
                         }
  
-if (isSaveEvent && formContext.data.entity.getIsDirty()) {
- // Prevent the default save behavior so that we can manually handle it later
-        eventArgs.preventDefault();
-                                var confirmStrings = {
-                                    title: "Unsaved Changes",
-                                    text: "Do you want to save changes before refreshing?"
-                                };
-                                var confirmOptions = {
-                                    height: 200,
-                                    width: 450
-                                };
-                                Xrm.Navigation.openConfirmDialog(confirmStrings, confirmOptions).then(function (success) {
-                                    if (success.confirmed) {
-                                        formContext.data.save().then(function () {
-                                            formContext.data.refresh(true);
-                                        });
-                                    } else {
-                                      SDK.Bupa.Sales.RDT.PAA2.Form.updateFieldVisibilityAndAccessibility(executionContext);
-                                    }
-                                });
-                            }
+if (executionContext.getEventArgs() && executionContext.getEventArgs().getSaveMode() === 1) { // Save mode
+            formContext.data.refresh(false).then(
+                function success() {
+                    console.log("Form refreshed successfully.");
+                },
+                function error(error) {
+                    console.error("Error refreshing the form: " + error.message);
+                }
+            );
+        }
+                                  
 
      }
                 }
