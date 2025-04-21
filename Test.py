@@ -4,7 +4,6 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
         var formContext = executionContext.getFormContext();
         var eventArgs = executionContext.getEventArgs();
         var isSaveEvent = eventArgs && typeof eventArgs.getSaveMode === "function";
-
         var statusPAA2 = formContext.getAttribute("statuscode").getValue();
         var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
 
@@ -83,38 +82,43 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                                     formContext.getAttribute("bupa_whoissigningdd").setRequiredLevel("none");
                                 }
                             }
-                            else
+                            else {
                                 console.error("Could not fetch home category: " + error.message);
-
-                            // Only show confirm dialog on Save and if there are unsaved changes
-                            if (isSaveEvent && formContext.data.entity.getIsDirty()) {
-                                var confirmStrings = {
-                                    title: "Unsaved Changes",
-                                    text: "Do you want to save changes before refreshing?"
-                                };
-                                var confirmOptions = {
-                                    height: 200,
-                                    width: 450
-                                };
-                                Xrm.Navigation.confirmDialog(confirmStrings, confirmOptions).then(function (success) {
-                                    if (success.confirmed) {
-                                        formContext.data.save().then(function () {
-                                            formContext.data.refresh(false);
-                                        });
-                                    } else {
-                                        formContext.data.refresh(true);
-                                    }
-                                });
                             }
-
                         })
                         .catch(function error(error) {
                             console.error("Home Category is not filled for this care home: " + error.message);
                         });
                 }
             }
+
+            // Confirm Dialog logic should trigger on form save
+            if (isSaveEvent) {
+                var confirmStrings = {
+                    title: "Unsaved Changes",
+                    text: "Do you want to save changes before refreshing?"
+                };
+
+                var confirmOptions = {
+                    height: 200,
+                    width: 450
+                };
+
+                Xrm.Navigation.confirmDialog(confirmStrings, confirmOptions)
+                    .then(function (success) {
+                        if (success.confirmed) {
+                            // User clicked "Save"
+                            formContext.data.save().then(function () {
+                                formContext.data.refresh(false); // Refresh after save
+                            });
+                        } else {
+                            // User clicked "Discard"
+                            formContext.data.refresh(true); // Force refresh and discard changes
+                        }
+                    });
+            }
         }
     } catch (err) {
-        console.log("Error" + err.message);
+        console.log("Error: " + err.message);
     }
 }
