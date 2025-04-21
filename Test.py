@@ -3,7 +3,18 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
     try {
         var formContext = executionContext.getFormContext();
         var eventArgs = executionContext.getEventArgs();
+
+        // Check if this is a Save event
         var isSaveEvent = eventArgs && typeof eventArgs.getSaveMode === "function";
+        
+        // If it is not a Save event, just proceed normally
+        if (!isSaveEvent) {
+            return;
+        }
+
+        // Prevent the default save behavior so that we can manually handle it later
+        eventArgs.preventDefault();
+
         var statusPAA2 = formContext.getAttribute("statuscode").getValue();
         var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
 
@@ -18,6 +29,7 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                             var category = result.bupa_homecategory;
                             if (category != null) {
                                 if (category == 100000000) {
+                                    // Set visibility and required level for various fields
                                     formContext.getControl("bupa_carehomeunit").setVisible(true);
                                     formContext.getAttribute("bupa_carehomeunit").setRequiredLevel("none");
                                     formContext.getControl("bupa_roomnumber").setVisible(true);
@@ -91,34 +103,34 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                         });
                 }
             }
-
-            // Confirm Dialog logic should trigger on form save
-            if (isSaveEvent) {
-                var confirmStrings = {
-                    title: "Unsaved Changes",
-                    text: "Do you want to save changes before refreshing?"
-                };
-
-                var confirmOptions = {
-                    height: 200,
-                    width: 450
-                };
-
-                Xrm.Navigation.confirmDialog(confirmStrings, confirmOptions)
-                    .then(function (success) {
-                        if (success.confirmed) {
-                            // User clicked "Save"
-                            formContext.data.save().then(function () {
-                                formContext.data.refresh(false); // Refresh after save
-                            });
-                        } else {
-                            // User clicked "Discard"
-                            formContext.data.refresh(true); // Force refresh and discard changes
-                        }
-                    });
-            }
         }
+
+        // Only show the confirm dialog if there are unsaved changes.
+        var confirmStrings = {
+            title: "Unsaved Changes",
+            text: "Do you want to save changes before refreshing?"
+        };
+
+        var confirmOptions = {
+            height: 200,
+            width: 450
+        };
+
+        Xrm.Navigation.confirmDialog(
+            confirmStrings, confirmOptions
+        ).then(function (success) {
+            if (success.confirmed) {
+                // User clicked "Save", so save the record
+                formContext.data.save().then(function () {
+                    formContext.data.refresh(false); // Refresh after saving
+                });
+            } else {
+                // User clicked "Discard", refresh without saving changes
+                formContext.data.refresh(true); // Force refresh and discard changes
+            }
+        });
+
     } catch (err) {
-        console.log("Error: " + err.message);
+        console.log("Error" + err.message);
     }
 }
