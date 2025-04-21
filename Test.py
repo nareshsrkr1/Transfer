@@ -1,5 +1,43 @@
 Test.py
 
+function refreshWithConfirmation(executionContext) {
+    var formContext = executionContext.getFormContext();
+
+    if (!formContext.data.entity.getIsDirty()) {
+        // No changes, just refresh
+        formContext.data.refresh(false);
+        return;
+    }
+
+    var confirmStrings = {
+        title: "Unsaved Changes",
+        text: "Do you want to save changes before refreshing?"
+    };
+
+    var confirmOptions = {
+        height: 200,
+        width: 450
+    };
+
+    Xrm.Navigation.openConfirmDialog(confirmStrings, confirmOptions).then(function (result) {
+        if (result.confirmed) {
+            // User clicked Save
+            formContext.data.save().then(function () {
+                formContext.data.refresh(false);
+            });
+        } else {
+            // User clicked Discard
+            formContext.data.refresh(true);  // Discard changes and refresh
+        }
+    });
+}
+
+
+
+
+
+
+
 
 function refreshOnlyAfterSave(executionContext) {
     var formContext = executionContext.getFormContext();
