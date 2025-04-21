@@ -1,5 +1,37 @@
 Test.py
 
+
+
+// Define a global flag (outside the function)
+var shouldRefreshAfterSave = false;
+
+function handleFormRefresh(executionContext) {
+    var formContext = executionContext.getFormContext();
+    var eventArgs = executionContext.getEventArgs();
+
+    // -------- OnSave --------
+    if (eventArgs && typeof eventArgs.getSaveMode === "function") {
+        var saveMode = eventArgs.getSaveMode();
+
+        if (saveMode === 1 || saveMode === 59 || saveMode === 70) {
+            // Set the flag to trigger refresh on load
+            shouldRefreshAfterSave = true;
+        }
+
+        return;
+    }
+
+    // -------- OnLoad --------
+    if (shouldRefreshAfterSave) {
+        shouldRefreshAfterSave = false; // reset the flag
+
+        setTimeout(function () {
+            formContext.data.refresh(false);
+        }, 1000);
+    }
+}
+
+
 if (eventArgs && typeof eventArgs.getSaveMode === "function") {
         var saveMode = eventArgs.getSaveMode();
 
