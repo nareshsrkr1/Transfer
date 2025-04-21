@@ -90,9 +90,17 @@ updateFieldVisibilityAndAccessibility: function (executionContext) {
                                     else
                                         console.error("Could not fetch home category: " + error.message);
 
+
+
+                                })
+                                .catch(function error(error) {
+                                    console.error("Home Category is not filled for this care home: " + error.message);
+                                });
+                        }
+ 
 if (isSaveEvent && formContext.data.entity.getIsDirty()) {
  // Prevent the default save behavior so that we can manually handle it later
-        eventArgs.preventDefault();
+        //eventArgs.preventDefault();
                                 var confirmStrings = {
                                     title: "Unsaved Changes",
                                     text: "Do you want to save changes before refreshing?"
@@ -101,24 +109,16 @@ if (isSaveEvent && formContext.data.entity.getIsDirty()) {
                                     height: 200,
                                     width: 450
                                 };
-                                Xrm.Navigation.confirmDialog(confirmStrings, confirmOptions).then(function (success) {
+                                Xrm.Navigation.openConfirmDialog(confirmStrings, confirmOptions).then(function (success) {
                                     if (success.confirmed) {
                                         formContext.data.save().then(function () {
-                                            formContext.data.refresh(false);
+                                            formContext.data.refresh(true);
                                         });
                                     } else {
                                         formContext.data.refresh(true);
                                     }
                                 });
                             }
-
-                                })
-                                .catch(function error(error) {
-                                    console.error("Home Category is not filled for this care home: " + error.message);
-                                });
-                        }
- 
-
 
      }
                 }
