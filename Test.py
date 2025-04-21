@@ -1,7 +1,56 @@
+Test.py
+
+
+function handleFormEvents(executionContext) {
+    var formContext = executionContext.getFormContext();
+    var eventArgs = executionContext.getEventArgs();
+
+    // -------------------------------
+    // OnSave Event: Refresh after save
+    // -------------------------------
+    if (eventArgs && eventArgs.getSaveMode) {
+        var saveMode = eventArgs.getSaveMode();
+        
+        if (saveMode === 1 || saveMode === 59 || saveMode === 70) {  // Save, Save and Close, etc.
+            setTimeout(function () {
+                formContext.data.refresh(false); // Refresh after save
+            }, 1000); // Adjust delay as needed
+        }
+    }
+
+    // -------------------------------
+    // OnLoad Event: No refresh needed
+    // -------------------------------
+    if (eventArgs && eventArgs.getEventName && eventArgs.getEventName() === "onload") {
+        return;
+    }
+
+    // -------------------------------
+    // OnChange Event: No refresh needed for change events
+    // -------------------------------
+    if (eventArgs && eventArgs.getEventName && eventArgs.getEventName() === "onchange") {
+        return;
+    }
+
+    // -------------------------------
+    // Handle Discard (manually trigger refresh)
+    // -------------------------------
+    if (formContext.data.entity.getIsDirty()) {
+        // If the form is dirty (has unsaved changes)
+        // Force a refresh to discard changes
+        setTimeout(function () {
+            formContext.data.refresh(true); // Force refresh and discard changes
+        }, 1000);  // Delay the refresh slightly to allow Dynamics internal state to settle
+    }
+}
+
+
+
+
 if (typeof (SDK) == "undefined") { SDK = { __namespace: true } }
 if (typeof (SDK.Bupa) == "undefined") { SDK.Bupa = { __namespace: true } }
 if (typeof (SDK.Bupa.Sales) == "undefined") { SDK.Bupa.Sales = { __namespace: true } }
-if (typeof (SDK.Bupa.Sales.RDT) == "undefined") { SDK.Bupa.Sales.RDT = { __namespace: true } }
+if (typeofs.RDT) == "undefined") { SDK.Bupa.Sales.RDT = { __namespace: true } }
 if (typeof (SDK.Bupa.Sales.RDT.PAA2) == "undefined") { SDK.Bupa.Sales.RDT.PAA2 = { __namespace: true } }
 if (typeof (SDK.Bupa.Sales.RDT.PAA2.Form) == "undefined") {
     SDK.Bupa.Sales.RDT.PAA2.Form = {
