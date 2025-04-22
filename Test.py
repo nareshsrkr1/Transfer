@@ -1,3 +1,75 @@
+var isConfirmedSave = false;
+
+updateFieldVisibilityAndAccessibility: async function (executionContext) {
+    debugger;
+    try {
+        var formContext = executionContext.getFormContext();
+        var eventArgs = executionContext.getEventArgs();
+        var isSaveEvent = eventArgs && typeof eventArgs.getSaveMode === "function";
+
+        var statusPAA2 = formContext.getAttribute("statuscode").getValue();
+        var hmDecision = formContext.getAttribute("bupa_hmdecision").getValue();
+
+        if (isSaveEvent && statusPAA2 == 100000004 && hmDecision == null) {
+            if (!isConfirmedSave) {
+                eventArgs.preventDefault();
+
+                await Xrm.Navigation.openConfirmDialog({
+                    title: "Confirmation",
+                    text: "HM Decision is not filled. Do you still want to save the record?"
+                }).then(function (result) {
+                    if (result.confirmed) {
+                        isConfirmedSave = true;
+                        formContext.data.save().then(function () {
+                            formContext.data.refresh();
+                        });
+                    } else {
+                        isConfirmedSave = false;
+                        formContext.data.refresh();
+                    }
+                });
+
+                return;
+            } else {
+                isConfirmedSave = false;
+            }
+        }
+
+        // --- Your original field visibility logic starts here ---
+        var careHomeLookup = formContext.getAttribute("bupa_bupacarehome").getValue();
+        if (careHomeLookup && careHomeLookup.length > 0) {
+            var careHomeID = careHomeLookup[0].id.replace("{", "").replace("}", "");
+            if (careHomeID != null) {
+                await Xrm.WebApi.retrieveRecord("bupa_bupacarehome", careHomeID, "?$select=bupa_homecategory")
+                    .then(function (result) {
+                        var category = result.bupa_homecategory;
+                        if (category != null) {
+                            // Set visibility/requirement logic based on category
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error("Error fetching care home: " + error.message);
+                    });
+            }
+        }
+    } catch (err) {
+        console.log("Error: " + err.message);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 updateFieldVisibilityAndAccessibility: async function (executionContext) {
            debugger;
             try {
