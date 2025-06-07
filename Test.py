@@ -1,8 +1,21 @@
-UPDATE u
-SET 
-    u.CLIENT_TYPE = d.CLIENT_TYPE,
-    u.CLIENT_SUBTTPE = d.CLIENT_SUBTTPE,
-    u.TIER = d.TIER
-FROM unfd_positions_dt u
-JOIN dynamic_overrides_mapping d
-    ON RTRIM(u.customer_legal_entity_name) = RTRIM(d.customer_legal_entity_name)
+# Create mapping from businessdate to businessdaycount
+bdc_map = dict(zip(businessdays['businessdate'], businessdays['businessdaycount']))
+
+# Create two new columns to hold the mapped businessdaycount values
+calculatedataframe['exit_bdc'] = calculatedataframe['tradeexitcalanderdate'].map(bdc_map)
+calculatedataframe['unwindend_bdc'] = calculatedataframe['unwindendday'].map(bdc_map)
+
+# Apply condition and update 'tradeexitperiod_inmths'
+mask = (
+    calculatedataframe['unwindstartday'].notna() &
+    calculatedataframe['unwindendday'].notna() &
+    calculatedataframe['Exit_Strategy'].str.lower().isin(['novation', 'compression']) &
+    calculatedataframe['exit_bdc'].notna() &
+    calculatedataframe['unwindend_bdc'].notna()
+)
+
+# Replace values only where condition is True
+calculatedataframe.loc[mask, 'tradeexitperiod_inmths'] = (
+    calculatedataframe.loc[mask, 'exit_bdc'].astype(int) -
+    calculatedataframe.loc[mask, 'unwindend_bdc'].astype(int)
+).astype(str)
