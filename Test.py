@@ -1,5 +1,4 @@
 import re
-import csv
 import traceback
 from sqlglot import parse_one, errors
 from sqlglot.expressions import *
@@ -14,7 +13,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     try:
         ast = parse_one(query, read=dialect)
-    except errors.ParseError:
+    except errors.ParseError as e:
         return {
             "columns": [],
             "tables": [],
@@ -22,7 +21,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
             "conditions": [],
             "ctes": [],
             "unions": [],
-            "unknown": [f"Failed to parse query: {raw_query}"]
+            "unknown": [f"Parse failed: {e}"]
         }
 
     info = {
@@ -37,9 +36,9 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     def extract(expr):
         try:
+            # Union detection
             if isinstance(expr, Union):
                 info["unions"].append(expr.token_type.value)  # UNION or UNION ALL
-                # Extract columns inside each part separately
                 extract(expr.left)
                 extract(expr.right)
                 return
@@ -68,32 +67,8 @@ def extract_sql_info(raw_query: str, dialect="hive"):
     extract(ast)
     return info
 
-def write_csv(info_dict, filename="parsed_sql_output.csv"):
-    # Calculate maximum number of rows needed
-    max_len = max(len(info_dict["columns"]), 1)
-
-    # Pad all lists to match max_len
-    def pad(lst):
-        return lst + [''] * (max_len - len(lst))
-
-    data = zip(
-        pad(info_dict["columns"]),
-        pad(info_dict["tables"]),
-        pad(info_dict["joins"]),
-        pad(info_dict["conditions"]),
-        pad(info_dict["ctes"]),
-        pad(info_dict["unions"]),
-        pad(info_dict["unknown"]),
-    )
-
-    with open(filename, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Columns", "Tables", "Joins", "Conditions", "CTEs", "Unions", "Unknown"])
-        for row in data:
-            writer.writerow(row)
-
 # ---------------------
-# Sample Query Input
+# Test Query
 # ---------------------
 query = """
 SELECT customer_id,
@@ -105,10 +80,12 @@ UNION ALL
 SELECT id, 'Archived' FROM archive_accounts
 """
 
-# Run extractor
-info = extract_sql_info(query)
+# Parse and print results
+parsed_info = extract_sql_info(query)
 
-# Save to CSV
-write_csv(info)
-
-print("✅ SQL parsed and saved to 'parsed_sql_output.csv'")
+for section, items in parsed_info.items():
+    print(f"\n=== {section.upper()} ===")
+    if not items:
+        print("- (none)")
+    for i in items:
+        print(f"- {i}")
