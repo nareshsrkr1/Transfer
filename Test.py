@@ -4,7 +4,7 @@ from sqlglot import parse_one, errors
 from sqlglot.expressions import *
 
 def normalize_query(query: str) -> str:
-    # Fix non-standard DATE_SUB(..., 180)
+    # Fix non-standard DATE_SUB(..., 180) → DATE_SUB(..., INTERVAL 180 DAY)
     return re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
 
 def extract_sql_info(raw_query: str, dialect="hive"):
@@ -36,36 +36,44 @@ def extract_sql_info(raw_query: str, dialect="hive"):
     def walk(expr):
         try:
             if isinstance(expr, Union):
-                # Capture union type
+                # UNION vs UNION ALL
                 union_type = "UNION" if expr.args.get("distinct") else "UNION ALL"
                 info["unions"].append(union_type)
-                walk(expr.args["left"])
-                walk(expr.args["right"])
+                walk(expr.left)  # safer access than args['left']
+                walk(expr.right)
 
             elif isinstance(expr, Select):
-                for proj in expr.expressions:
-                    info["columns"].append(str(proj))
-
-                if expr.args.get("where"):
-                    info["conditions"].append(str(expr.args["where"].this))
+                if expr.expressions:
+                    info["columns"].extend(str(p) for p in expr.expressions)
 
                 if expr.args.get("from"):
                     walk(expr.args["from"])
+
+                if expr.args.get("joins"):
+                    for join in expr.args["joins"]:
+                        walk(join)
+
+                if expr.args.get("where"):
+                    info["conditions"].append(str(expr.args["where"].this))
 
             elif isinstance(expr, Table):
                 info["tables"].append(str(expr))
 
             elif isinstance(expr, Join):
                 info["joins"].append(str(expr))
-                walk(expr.args.get("this"))
-                walk(expr.args.get("expression"))
+                if expr.args.get("this"):
+                    walk(expr.args["this"])
+                if expr.args.get("expression"):
+                    walk(expr.args["expression"])
 
             elif isinstance(expr, Subquery):
-                walk(expr.args.get("this"))
+                if expr.args.get("this"):
+                    walk(expr.args["this"])
 
             elif isinstance(expr, CTE):
                 info["ctes"].append(str(expr))
-                walk(expr.args.get("this"))
+                if expr.args.get("this"):
+                    walk(expr.args["this"])
 
             elif isinstance(expr, CTEs):
                 for cte in expr.expressions:
@@ -75,7 +83,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
                 for e in expr.expressions:
                     walk(e)
 
-            # Recurse into all child expressions
+            # Catch all: walk children recursively
             for child in expr.args.values():
                 if isinstance(child, Expression):
                     walk(child)
@@ -85,13 +93,13 @@ def extract_sql_info(raw_query: str, dialect="hive"):
                             walk(c)
 
         except Exception:
-            info["unknown"].append(f"Sub-part parse failed:\n{traceback.format_exc()}")
+            info["unknown"].append(f"Failed to walk part of AST:\n{traceback.format_exc()}")
 
     walk(ast)
     return info
 
 # ---------------------
-# Sample Query
+# Test SQL
 # ---------------------
 query = """
 SELECT customer_id,
@@ -103,7 +111,7 @@ UNION ALL
 SELECT id, 'Archived' FROM archive_accounts
 """
 
-# Extract and display results
+# Parse and display results
 parsed_info = extract_sql_info(query)
 
 for section, items in parsed_info.items():
