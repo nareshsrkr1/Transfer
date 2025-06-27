@@ -13,7 +13,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     try:
         ast = parse_one(query, read=dialect)
-    except errors.ParseError as e:
+    except errors.ParseError:
         return {
             "columns": [],
             "tables": [],
@@ -21,7 +21,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
             "conditions": [],
             "ctes": [],
             "unions": [],
-            "unknown": [f"Parse failed: {e}"]
+            "unknown": [f"Failed to parse query: {raw_query}"]
         }
 
     info = {
@@ -36,9 +36,10 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     def extract(expr):
         try:
-            # Union detection
+            # Handle UNION without storing SELECT parts in 'unions'
             if isinstance(expr, Union):
-                info["unions"].append(expr.token_type.value)  # UNION or UNION ALL
+                union_type = expr.token_type.value  # 'UNION' or 'UNION ALL'
+                info["unions"].append(union_type)
                 extract(expr.left)
                 extract(expr.right)
                 return
