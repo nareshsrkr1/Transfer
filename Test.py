@@ -5,15 +5,14 @@ from sqlglot.expressions import *
 
 def normalize_query(query: str) -> str:
     # Fix non-standard DATE_SUB(..., 180)
-    query = re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
-    return query
+    return re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
 
 def extract_sql_info(raw_query: str, dialect="hive"):
     query = normalize_query(raw_query)
 
     try:
         ast = parse_one(query, read=dialect)
-    except errors.ParseError:
+    except errors.ParseError as e:
         return {
             "columns": [],
             "tables": [],
@@ -21,7 +20,7 @@ def extract_sql_info(raw_query: str, dialect="hive"):
             "conditions": [],
             "ctes": [],
             "unions": [],
-            "unknown": [f"Failed to parse query: {raw_query}"]
+            "unknown": [f"Parse failed: {e}"]
         }
 
     info = {
@@ -34,42 +33,65 @@ def extract_sql_info(raw_query: str, dialect="hive"):
         "unknown": []
     }
 
-    def extract(expr):
+    def walk(expr):
         try:
-            # Handle UNION and distinguish UNION vs UNION ALL
             if isinstance(expr, Union):
+                # Capture union type
                 union_type = "UNION" if expr.args.get("distinct") else "UNION ALL"
                 info["unions"].append(union_type)
-                extract(expr.left)
-                extract(expr.right)
-                return
+                walk(expr.args["left"])
+                walk(expr.args["right"])
 
-            for select in expr.find_all(Select):
-                info["columns"].extend(str(p) for p in select.expressions)
+            elif isinstance(expr, Select):
+                for proj in expr.expressions:
+                    info["columns"].append(str(proj))
 
-            for table in expr.find_all(Table):
-                info["tables"].append(str(table))
+                if expr.args.get("where"):
+                    info["conditions"].append(str(expr.args["where"].this))
 
-            for join in expr.find_all(Join):
-                info["joins"].append(str(join))
+                if expr.args.get("from"):
+                    walk(expr.args["from"])
 
-            for where in expr.find_all(Where):
-                info["conditions"].append(str(where.this))
+            elif isinstance(expr, Table):
+                info["tables"].append(str(expr))
 
-            for cte in expr.find_all(CTE):
-                info["ctes"].append(str(cte))
+            elif isinstance(expr, Join):
+                info["joins"].append(str(expr))
+                walk(expr.args.get("this"))
+                walk(expr.args.get("expression"))
 
-            for subquery in expr.find_all(Subquery):
-                extract(subquery)
+            elif isinstance(expr, Subquery):
+                walk(expr.args.get("this"))
+
+            elif isinstance(expr, CTE):
+                info["ctes"].append(str(expr))
+                walk(expr.args.get("this"))
+
+            elif isinstance(expr, CTEs):
+                for cte in expr.expressions:
+                    walk(cte)
+
+            elif isinstance(expr, From):
+                for e in expr.expressions:
+                    walk(e)
+
+            # Recurse into all child expressions
+            for child in expr.args.values():
+                if isinstance(child, Expression):
+                    walk(child)
+                elif isinstance(child, list):
+                    for c in child:
+                        if isinstance(c, Expression):
+                            walk(c)
 
         except Exception:
             info["unknown"].append(f"Sub-part parse failed:\n{traceback.format_exc()}")
 
-    extract(ast)
+    walk(ast)
     return info
 
 # ---------------------
-# Test Query
+# Sample Query
 # ---------------------
 query = """
 SELECT customer_id,
@@ -81,7 +103,7 @@ UNION ALL
 SELECT id, 'Archived' FROM archive_accounts
 """
 
-# Parse and print results
+# Extract and display results
 parsed_info = extract_sql_info(query)
 
 for section, items in parsed_info.items():
