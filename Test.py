@@ -1,88 +1,38 @@
-import re
-from sqlglot import parse_one, errors
-from sqlglot.expressions import *
-import traceback
-
-def normalize_query(query: str) -> str:
-    # Fix non-standard DATE_SUB(..., 180) → DATE_SUB(..., INTERVAL 180 DAY)
-    query = re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
-    return query
-
-def extract_sql_info(raw_query: str, dialect="hive"):
-    query = normalize_query(raw_query)
-
+def extract(expr, visited_ids=None, depth=0):
     try:
-        ast = parse_one(query, read=dialect)
-    except errors.ParseError:
-        return {
-            "columns": [],
-            "tables": [],
-            "joins": [],
-            "conditions": [],
-            "ctes": [],
-            "unions": [],
-            "unknown": [f"Failed to parse query: {raw_query}"]
-        }
+        if visited_ids is None:
+            visited_ids = set()
 
-    info = {
-        "columns": [],
-        "tables": [],
-        "joins": [],
-        "conditions": [],
-        "ctes": [],
-        "unions": [],
-        "unknown": []
-    }
+        if id(expr) in visited_ids or depth > 50:
+            return  # prevent infinite loops or deep nesting
 
-    def extract(expr):
-        try:
-            for select in expr.find_all(Select):
-                info["columns"].extend(str(p) for p in select.expressions)
+        visited_ids.add(id(expr))
 
-            for table in expr.find_all(Table):
-                info["tables"].append(str(table))
+        for select in expr.find_all(Select):
+            info["columns"].extend(str(p) for p in select.expressions)
 
-            for join in expr.find_all(Join):
-                info["joins"].append(str(join))
+        for table in expr.find_all(Table):
+            info["tables"].append(str(table))
 
-            for where in expr.find_all(Where):
-                info["conditions"].append(str(where.this))
+        for join in expr.find_all(Join):
+            info["joins"].append(str(join))
 
-            for group in expr.find_all(Group):
-                if group.expressions:
-                    info["conditions"].extend(str(g) for g in group.expressions)
+        for where in expr.find_all(Where):
+            info["conditions"].append(str(where.this))
 
-            for cte in expr.find_all(CTE):
-                info["ctes"].append(str(cte))
+        for group in expr.find_all(Group):
+            if group.expressions:
+                info["conditions"].extend(str(g) for g in group.expressions)
 
-            if isinstance(expr, Union):
-                info["unions"].append(str(expr))
+        for cte in expr.find_all(CTE):
+            info["ctes"].append(str(cte))
 
-            for subquery in expr.find_all(Subquery):
-                extract(subquery)
+        if isinstance(expr, Union):
+            info["unions"].append(str(expr))
 
-        except Exception:
-            info["unknown"].append(f"Sub-part parse failed:\n{traceback.format_exc()}")
+        # NEW: prevent infinite recursion on malformed subqueries
+        for subquery in expr.find_all(Subquery):
+            extract(subquery, visited_ids, depth + 1)
 
-    extract(ast)
-    return info
-
-# Example query input
-query = """
-SELECT customer_id, status, date_sub(from_unixtime(unix_timestamp()), 180) AS last180days
-FROM orders
-WHERE status = 'SHIPPED'
-GROUP BY customer_id, status
-UNION ALL
-SELECT id, status FROM archive_orders
-GROUP BY id, status
-"""
-
-# Run parser
-parsed_info = extract_sql_info(query)
-
-# Print structured output
-for section, items in parsed_info.items():
-    print(f"\n=== {section.upper()} ===")
-    for i in items:
-        print(f"- {i}")
+    except Exception:
+        info["unknown"].append(f"Sub-part parse failed:\n{traceback.format_exc()}")
