@@ -36,9 +36,9 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     def extract(expr):
         try:
-            # Handle UNION without storing SELECT parts in 'unions'
+            # Handle UNION and distinguish UNION vs UNION ALL
             if isinstance(expr, Union):
-                union_type = expr.token_type.value  # 'UNION' or 'UNION ALL'
+                union_type = "UNION" if expr.args.get("distinct") else "UNION ALL"
                 info["unions"].append(union_type)
                 extract(expr.left)
                 extract(expr.right)
