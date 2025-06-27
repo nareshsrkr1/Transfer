@@ -4,21 +4,24 @@ from sqlglot.expressions import *
 import traceback
 
 def normalize_query(query: str) -> str:
-    return re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
+    # Fix non-standard DATE_SUB(..., 180) → DATE_SUB(..., INTERVAL 180 DAY)
+    query = re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
+    return query
 
-def extract_sql_info(query: str, dialect="hive"):
-    query = normalize_query(query)
+def extract_sql_info(raw_query: str, dialect="hive"):
+    query = normalize_query(raw_query)
 
     try:
         ast = parse_one(query, read=dialect)
-    except errors.ParseError as e:
+    except errors.ParseError:
         return {
             "columns": [],
             "tables": [],
             "joins": [],
             "conditions": [],
+            "ctes": [],
             "unions": [],
-            "unknown": [f"Parse failed: {e}"]
+            "unknown": [f"Failed to parse query: {raw_query}"]
         }
 
     info = {
@@ -26,75 +29,60 @@ def extract_sql_info(query: str, dialect="hive"):
         "tables": [],
         "joins": [],
         "conditions": [],
+        "ctes": [],
         "unions": [],
         "unknown": []
     }
 
-    def process(expr):
+    def extract(expr):
         try:
+            for select in expr.find_all(Select):
+                info["columns"].extend(str(p) for p in select.expressions)
+
+            for table in expr.find_all(Table):
+                info["tables"].append(str(table))
+
+            for join in expr.find_all(Join):
+                info["joins"].append(str(join))
+
+            for where in expr.find_all(Where):
+                info["conditions"].append(str(where.this))
+
+            for group in expr.find_all(Group):
+                if group.expressions:
+                    info["conditions"].extend(str(g) for g in group.expressions)
+
+            for cte in expr.find_all(CTE):
+                info["ctes"].append(str(cte))
+
             if isinstance(expr, Union):
-                info["unions"].append("UNION" if expr.args.get("distinct") else "UNION ALL")
-                process(expr.args.get("left"))
-                process(expr.args.get("right"))
+                info["unions"].append(str(expr))
 
-            elif isinstance(expr, Select):
-                for col in expr.expressions or []:
-                    info["columns"].append(str(col))
-
-                if expr.args.get("from"):
-                    for src in expr.args["from"].expressions:
-                        process(src)
-
-                if expr.args.get("joins"):
-                    for j in expr.args["joins"]:
-                        info["joins"].append(str(j))
-                        if j.args.get("this"):
-                            process(j.args["this"])
-                        if j.args.get("expression"):
-                            process(j.args["expression"])
-
-                if expr.args.get("where"):
-                    info["conditions"].append(str(expr.args["where"].this))
-
-            elif isinstance(expr, Table):
-                info["tables"].append(str(expr))
-
-            elif isinstance(expr, Subquery):
-                process(expr.args.get("this"))
-
-            # Fallback recursion for any children
-            for child in expr.args.values():
-                if isinstance(child, Expression):
-                    process(child)
-                elif isinstance(child, list):
-                    for c in child:
-                        if isinstance(c, Expression):
-                            process(c)
+            for subquery in expr.find_all(Subquery):
+                extract(subquery)
 
         except Exception:
-            info["unknown"].append(traceback.format_exc())
+            info["unknown"].append(f"Sub-part parse failed:\n{traceback.format_exc()}")
 
-    process(ast)
+    extract(ast)
     return info
 
-# Example Query
+# Example query input
 query = """
-SELECT customer_id,
-       CASE WHEN a.use_of_collateral = 'X' THEN 'From' ELSE 'GRB' END AS status_text
-FROM accounts a
-JOIN customers c ON a.customer_id = c.id
-WHERE c.country = 'IN'
+SELECT customer_id, status, date_sub(from_unixtime(unix_timestamp()), 180) AS last180days
+FROM orders
+WHERE status = 'SHIPPED'
+GROUP BY customer_id, status
 UNION ALL
-SELECT id, 'Archived' FROM archive_accounts
+SELECT id, status FROM archive_orders
+GROUP BY id, status
 """
 
-# Run and print output
-parsed = extract_sql_info(query)
+# Run parser
+parsed_info = extract_sql_info(query)
 
-for section, values in parsed.items():
+# Print structured output
+for section, items in parsed_info.items():
     print(f"\n=== {section.upper()} ===")
-    if not values:
-        print("- (none)")
-    else:
-        for v in values:
-            print(f"- {v}")
+    for i in items:
+        print(f"- {i}")
