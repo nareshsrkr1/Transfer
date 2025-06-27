@@ -1,12 +1,12 @@
 import re
+import csv
+import traceback
 from sqlglot import parse_one, errors
 from sqlglot.expressions import *
-import traceback
 
 def normalize_query(query: str) -> str:
-    # Fix non-standard DATE_SUB(..., 180) → DATE_SUB(..., INTERVAL 180 DAY)
+    # Fix non-standard DATE_SUB(..., 180)
     query = re.sub(r"date_sub\s*([^,]+),\s*(\d+)", r"date_sub(\1, INTERVAL \2 DAY)", query, flags=re.IGNORECASE)
-    # Add more custom fixes here if needed
     return query
 
 def extract_sql_info(raw_query: str, dialect="hive"):
@@ -37,6 +37,13 @@ def extract_sql_info(raw_query: str, dialect="hive"):
 
     def extract(expr):
         try:
+            if isinstance(expr, Union):
+                info["unions"].append(expr.token_type.value)  # UNION or UNION ALL
+                # Extract columns inside each part separately
+                extract(expr.left)
+                extract(expr.right)
+                return
+
             for select in expr.find_all(Select):
                 info["columns"].extend(str(p) for p in select.expressions)
 
@@ -52,9 +59,6 @@ def extract_sql_info(raw_query: str, dialect="hive"):
             for cte in expr.find_all(CTE):
                 info["ctes"].append(str(cte))
 
-            if isinstance(expr, Union):
-                info["unions"].append(str(expr))
-
             for subquery in expr.find_all(Subquery):
                 extract(subquery)
 
@@ -64,20 +68,47 @@ def extract_sql_info(raw_query: str, dialect="hive"):
     extract(ast)
     return info
 
-# Example query input
+def write_csv(info_dict, filename="parsed_sql_output.csv"):
+    # Calculate maximum number of rows needed
+    max_len = max(len(info_dict["columns"]), 1)
+
+    # Pad all lists to match max_len
+    def pad(lst):
+        return lst + [''] * (max_len - len(lst))
+
+    data = zip(
+        pad(info_dict["columns"]),
+        pad(info_dict["tables"]),
+        pad(info_dict["joins"]),
+        pad(info_dict["conditions"]),
+        pad(info_dict["ctes"]),
+        pad(info_dict["unions"]),
+        pad(info_dict["unknown"]),
+    )
+
+    with open(filename, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Columns", "Tables", "Joins", "Conditions", "CTEs", "Unions", "Unknown"])
+        for row in data:
+            writer.writerow(row)
+
+# ---------------------
+# Sample Query Input
+# ---------------------
 query = """
-SELECT customer_id, date_sub(from_unixtime(unix_timestamp()), 180) AS last180days
-FROM orders
-WHERE status = 'SHIPPED'
+SELECT customer_id,
+       CASE WHEN a.use_of_collateral = 'X' THEN 'From' ELSE 'GRB' END AS status_text
+FROM accounts a
+JOIN customers c ON a.customer_id = c.id
+WHERE c.country = 'IN'
 UNION ALL
-SELECT id, created_at FROM archive_orders
+SELECT id, 'Archived' FROM archive_accounts
 """
 
-# Run parser
-parsed_info = extract_sql_info(query)
+# Run extractor
+info = extract_sql_info(query)
 
-# Print structured output
-for section, items in parsed_info.items():
-    print(f"\n=== {section.upper()} ===")
-    for i in items:
-        print(f"- {i}")
+# Save to CSV
+write_csv(info)
+
+print("✅ SQL parsed and saved to 'parsed_sql_output.csv'")
