@@ -1,26 +1,22 @@
-Slide 5: Agentic RAG – Smarter, Goal-Oriented RAG
+Slide 6: Agentic AI – Towards Autonomous Reasoning
+Autonomous agents: LLMs with goals, memory, planning, and tool-use that can operate in loops until objectives are met.
 
-Content (on slide):
+Characteristics:
+Goal-oriented, reflective, iterative; can run with minimal user input while keeping state/memory across steps.
 
-Goes beyond one-shot responses
+Applications:
 
-Multi-step reasoning using tools and memory
+Research assistants coordinating multi-source synthesis.
 
-Uses an Agent to:
+Automated coding with tool chains and tests.
 
-Break down tasks
+Financial planning agents that retrieve policies, compute metrics, and draft evidence-backed outputs.
 
-Plan actions
+Demo – Live Demo Flow (What to show)
+Traditional: ask a domain question; note fluency but no citations or specific policy grounding.
 
-Retrieve iteratively
+RAG: same question; display cited snippets from knowledge base for auditability.
 
-Decide next steps
+Agentic RAG: a multi-part task; show retrieval_needed decision and iterative retrieval improving completeness.
 
-Can correct itself and adapt
-
-More dynamic than static RAG
-
-Visual idea:
-A flow showing:
-User Query → Agent (Plans & Decides) → Multiple RAG Retrieval Cycles → Final Answer
-(Agent is shown as the “brain” that decides when and how to call retrieval multiple times.)
+Agentic AI: add tool use (e.g., calculator), planning, and memory to deliver a final, cited, computed result with minimal prompting.
