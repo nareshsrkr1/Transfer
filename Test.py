@@ -1,13 +1,24 @@
-Introduction & Context
+Slide 2 – Traditional AI: Task-Specific Intelligence
+Title: Traditional AI – Building from Scratch
 
-Traditional AI – Task-Specific Systems
+Bullet points:
 
-Generative AI – Pretrained, Language-Capable Models
+Neural Networks: Layers of interconnected nodes
 
-RAG – Retrieval-Augmented Generation
+Weight Adjustment: Learning by tuning weights to reduce error
 
-Agentic RAG – Smarter, Goal-Oriented Systems
+Loss Function: Measures prediction error (MSE, Cross-Entropy, etc.)
 
-Agentic AI – Memory, Reasoning & Autonomy
+Task-specific training: One model, one job
 
-Live Demo – Progressive evolution
+Requires large labeled datasets
+
+Limited to patterns learned in training
+
+Limitations:
+
+No general reasoning
+
+No memory of past interactions
+
+Needs retraining for new tasks
