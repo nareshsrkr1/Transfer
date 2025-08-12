@@ -1,25 +1,18 @@
-Title: Generative AI – From Pattern Matching to Understanding
+RAG – Injecting Fresh, Relevant Knowledge into AI
 
-Bullet points:
+Problem with Generative AI:
+Knowledge is static → can’t access the latest information
+Can’t reference internal or proprietary documents without retraining
 
-Pretrained Models – trained on massive datasets (books, articles, websites, code)
+Solution Combine Search + Generation
 
-Examples: GPT, Gemini, Claude
+How RAG works:
+User query → AI sends it to a Retriever
+Retriever searches a knowledge source (vector database, document store)
+Relevant documents are fetched
+AI generates the answer using both its pretrained knowledge + retrieved context
 
-Understands natural language & generates human-like responses
-
-Key shift: Models already know a lot before customization
-
-Can be adapted quickly for new tasks via:
-
-Prompt Engineering (lightweight customization)
-
-Fine-tuning (deeper customization)
-
-Learns patterns, context, and reasoning structures
-
-Limitations:
-
-Knowledge fixed at training time
-
-Cannot access latest or domain-specific data without retraining or augmentation
+Benefits:
+Access to up-to-date info
+Domain-specific knowledge without retraining
+Keeps responses accurate and grounded in real data
