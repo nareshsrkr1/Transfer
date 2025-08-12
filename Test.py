@@ -1,24 +1,25 @@
-Slide 2 – Traditional AI: Task-Specific Intelligence
-Title: Traditional AI – Building from Scratch
+Title: Generative AI – From Pattern Matching to Understanding
 
 Bullet points:
 
-Neural Networks: Layers of interconnected nodes
+Pretrained Models – trained on massive datasets (books, articles, websites, code)
 
-Weight Adjustment: Learning by tuning weights to reduce error
+Examples: GPT, Gemini, Claude
 
-Loss Function: Measures prediction error (MSE, Cross-Entropy, etc.)
+Understands natural language & generates human-like responses
 
-Task-specific training: One model, one job
+Key shift: Models already know a lot before customization
 
-Requires large labeled datasets
+Can be adapted quickly for new tasks via:
 
-Limited to patterns learned in training
+Prompt Engineering (lightweight customization)
+
+Fine-tuning (deeper customization)
+
+Learns patterns, context, and reasoning structures
 
 Limitations:
 
-No general reasoning
+Knowledge fixed at training time
 
-No memory of past interactions
-
-Needs retraining for new tasks
+Cannot access latest or domain-specific data without retraining or augmentation
