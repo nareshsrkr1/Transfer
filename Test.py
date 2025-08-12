@@ -1,18 +1,26 @@
-RAG – Injecting Fresh, Relevant Knowledge into AI
+Slide 5: Agentic RAG – Smarter, Goal-Oriented RAG
 
-Problem with Generative AI:
-Knowledge is static → can’t access the latest information
-Can’t reference internal or proprietary documents without retraining
+Content (on slide):
 
-Solution Combine Search + Generation
+Goes beyond one-shot responses
 
-How RAG works:
-User query → AI sends it to a Retriever
-Retriever searches a knowledge source (vector database, document store)
-Relevant documents are fetched
-AI generates the answer using both its pretrained knowledge + retrieved context
+Multi-step reasoning using tools and memory
 
-Benefits:
-Access to up-to-date info
-Domain-specific knowledge without retraining
-Keeps responses accurate and grounded in real data
+Uses an Agent to:
+
+Break down tasks
+
+Plan actions
+
+Retrieve iteratively
+
+Decide next steps
+
+Can correct itself and adapt
+
+More dynamic than static RAG
+
+Visual idea:
+A flow showing:
+User Query → Agent (Plans & Decides) → Multiple RAG Retrieval Cycles → Final Answer
+(Agent is shown as the “brain” that decides when and how to call retrieval multiple times.)
